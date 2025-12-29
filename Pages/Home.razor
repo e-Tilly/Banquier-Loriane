@@ -1,0 +1,470 @@
+﻿@page "/"
+@using BankerGameWeb.Models
+@using BankerGameWeb.Services
+@inject GameService GameService
+
+<PageTitle>Le Banquier - Cadeau d'Anniversaire</PageTitle>
+
+<div class="game-container">
+    <!-- Left Prize Pane (Always Visible) -->
+    <div class="prize-pane">
+        <div class="prize-pane-header">
+            <h3>Cadeaux</h3>
+        </div>
+        <div class="prize-list">
+            @foreach (var prize in prizes)
+            {
+                <div class="prize-item @(prize.IsRevealed ? "revealed" : "")">
+                    <span class="prize-name">@prize.Name</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Main Game Area -->
+    <div class="main-game-area">
+        <!-- Won Special Gifts Icons (Top Right) -->
+        @if (GameService.GetWonSpecialGifts().Any())
+        {
+            <div class="special-gifts-icons">
+                @foreach (var gift in GameService.GetWonSpecialGifts())
+                {
+                    <div class="special-gift-icon" title="@gift.Name">
+                        🎁
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- Header -->
+        <div class="header">
+            <h1>🎁 LE BANQUIER - SPÉCIAL FÊTE DE LORIANE 🎁 </h1>
+            @* <div class="round-info">Tour @GameService.GetCurrentRound() - Ouvrir: @GameService.GetMalletsToOpenThisRound()</div> *@
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            @statusMessage
+        </div>
+
+        <!-- Mallets Grid -->
+        <div class="mallets-grid">
+            @foreach (var mallet in mallets)
+            {
+                <button class="mallet @(mallet.IsOpen ? "open" : "") @(mallet.IsSelected ? "selected" : "")"
+                        @onclick="() => SelectMallet(mallet.Number)"
+                        disabled="@(!CanSelectMallet(mallet))">
+                    @if (mallet.IsSelected)
+                    {
+                        <div class="mallet-selected">
+                            <div class="star">⭐</div>
+                            <div class="number">@mallet.Number</div>
+                            <div class="label">TON COFFRET</div>
+                        </div>
+                    }
+                    else if (mallet.IsOpen)
+                    {
+                        <div class="mallet-open">
+                            <div class="icon">📭</div>
+                            <div class="prize-name-small">@mallet.Prize?.Name</div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mallet-closed">
+                            <div class="gift">🎁</div>
+                            <div class="number">@mallet.Number</div>
+                        </div>
+                    }
+                </button>
+            }
+        </div>
+    </div>
+
+    <!-- Welcome Birthday Popup -->
+    @if (showWelcomePopup)
+    {
+        <div class="modal-overlay">
+            <div class="welcome-popup">
+                <button class="modal-close-btn" @onclick="CloseWelcomePopup">✕</button>
+                <h2>🎂 Joyeux anniversaire Loriane! 🎂</h2>
+                <div class="welcome-content">
+                    <p>Ton cadeau se trouve ici, il suffit de jouer pour le découvrir</p>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Special Gift Modal -->
+    @if (showSpecialGift && currentSpecialGift != null)
+    {
+        <div class="modal-overlay">
+            <div class="special-gift-modal">
+                <button class="modal-close-btn" @onclick="CloseSpecialGift">✕</button>
+                <div class="special-gift-header">🎉 CADEAU BONUS! 🎉</div>
+                <div class="special-gift-content">
+                    <div class="special-gift-icon">🎁✨</div>
+                    <div class="special-gift-name">@currentSpecialGift.Name</div>
+                    <div class="special-gift-message">
+                        ✨ Tu gagnes ce cadeau et tu le gardes peu importe ce qui arrive! ✨
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Undo Offer Modal -->
+    @if (showUndoOffer)
+    {
+        <div class="modal-overlay">
+            <div class="modal banker-modal">
+                <div class="banker-header">📞 LE BANQUIER 📞</div>
+                <div class="banker-message">Es-tu sûr(e) de vouloir accepter cette offre?</div>
+                <div class="offer-box">
+                    <div class="offer-label">TON CADEAU:</div>
+                    <div class="offer-name">@acceptedOfferMessage</div>
+                </div>
+                <div class="offer-buttons">
+                    <button class="accept-btn" @onclick="ConfirmAcceptOffer">✅ OUI, JE PRENDS</button>
+                    <button class="reject-btn" @onclick="UndoAcceptOffer">❌ NON, JE CONTINUE</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Prize Reveal Animation Modal -->
+    @if (showPrizeAnimation && currentPrize != null)
+    {
+        <div class="modal-overlay">
+            <div class="prize-animation-modal">
+                <div class="prize-reveal">
+                    <div class="gift-icon-large">🎁</div>
+                    <div class="prize-name-large">@currentPrize.Name</div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Banker Offer Modal -->
+    @if (showBankerOffer && currentOffer != null)
+    {
+        <div class="modal-overlay" @onclick="() => {}">
+            <div class="banker-modal" @onclick:stopPropagation="true">
+                <h2>📞 APPEL DU BANQUIER</h2>
+                @* <p class="banker-message">@currentOffer.Message</p> *@
+                <div class="offer-box">
+                    <div class="offer-label">JE T'OFFRE:</div>
+                    <div class="offer-name">@currentOffer.Message</div>
+                </div>
+                <div class="offer-buttons">
+                    <button class="accept-btn" @onclick="AcceptOffer">✅ ACCEPTER</button>
+                    <button class="reject-btn" @onclick="RejectOffer">❌ REFUSER</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Final Winning Popup -->
+    @if (showFinalWinning)
+    {
+        <div class="modal-overlay">
+            <div class="final-winning-modal">
+                <h2>🎉 Félicitations! 🎉</h2>
+                <div class="final-winning-content">
+                    <h3>Tes cadeaux gagnés:</h3>
+                    <div class="winning-prizes">
+                        @foreach (var mallet in GameService.GetPlayerMallets())
+                        {
+                            @if (mallet.Prize != null)
+                            {
+                                <div class="winning-prize-item">
+                                    <span class="prize-icon">🎁</span>
+                                    <span class="prize-name">@mallet.Prize.Name</span>
+                                </div>
+                            }
+                        }
+                    </div>
+                    @if (GameService.GetWonSpecialGifts().Any())
+                    {
+                        <h3>Cadeaux spéciaux bonus:</h3>
+                        <div class="winning-special-gifts">
+                            @foreach (var gift in GameService.GetWonSpecialGifts())
+                            {
+                                <div class="winning-prize-item">
+                                    <span class="prize-icon">✨</span>
+                                    <span class="prize-name">@gift.Name</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Mallet> mallets = new();
+    private List<Prize> prizes = new();
+    private string statusMessage = "Chargement...";
+    private GameState currentState = GameState.SelectingPlayerMallet;
+    private bool showBankerOffer = false;
+    private BankerOffer? currentOffer;
+    private bool showPrizeAnimation = false;
+    private Prize? currentPrize;
+    private bool showSpecialGift = false;
+    private SpecialGift? currentSpecialGift;
+    private bool isInitialized = false;
+    private bool showPrizeMenu = false;
+    private bool showFinalWinning = false;
+    private bool showWelcomePopup = true;
+    private bool showUndoOffer = false;
+    private string? acceptedOfferMessage = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!isInitialized)
+        {
+            await GameService.InitializeAsync();
+            isInitialized = true;
+        }
+        StartNewGame();
+    }
+
+    private void StartNewGame()
+    {
+        GameService.StartNewGame();
+        mallets = GameService.GetMallets();
+        prizes = GameService.GetRemainingPrizes();
+        currentState = GameState.SelectingPlayerMallet;
+        statusMessage = "Choisis 3 coffrets que tu garderas!";
+        showBankerOffer = false;
+        showSpecialGift = false;
+        showPrizeAnimation = false;
+        showPrizeMenu = false;
+        showFinalWinning = false;
+        showUndoOffer = false;
+        acceptedOfferMessage = null;
+    }
+
+    private void TogglePrizeMenu()
+    {
+        showPrizeMenu = !showPrizeMenu;
+    }
+
+    private void CloseSpecialGift()
+    {
+        showSpecialGift = false;
+        StateHasChanged();
+    }
+
+    private void CloseWelcomePopup()
+    {
+        showWelcomePopup = false;
+        StateHasChanged();
+    }
+
+    private bool CanSelectMallet(Mallet mallet)
+    {
+        if (mallet.IsOpen) return false;
+        if (mallet.IsSelected) return false;
+        if (currentState == GameState.SelectingPlayerMallet) return !mallet.IsSelected;
+        if (currentState == GameState.OpeningMallets) return !mallet.IsSelected;
+        return false;
+    }
+
+    private async Task SelectMallet(int malletNumber)
+    {
+        if (currentState == GameState.SelectingPlayerMallet)
+        {
+            if (GameService.SelectPlayerMallet(malletNumber))
+            {
+                var selectedCount = GameService.GetPlayerMalletsSelected();
+                mallets = GameService.GetMallets(); // Update mallets to reflect selection
+                
+                // Update status message based on how many selected
+                if (selectedCount < 3)
+                {
+                    int remaining = 3 - selectedCount;
+                    statusMessage = $"Le coffret #{malletNumber} est maintenant à toi si tu décides de le garder! Maintenant, choisis {remaining} autre{(remaining > 1 ? "s" : "")}.";
+                }
+                else
+                {
+                    statusMessage = $"Le coffret #{malletNumber} est maintenant à toi si tu décides de le garder! Maintenant, ouvre des coffrets pour éliminer des cadeaux.";
+                    currentState = GameState.OpeningMallets;
+                }
+                StateHasChanged();
+            }
+        }
+        else if (currentState == GameState.OpeningMallets)
+        {
+            if (GameService.OpenMallet(malletNumber))
+            {
+                var mallet = mallets.First(m => m.Number == malletNumber);
+                
+                // Check for special gift
+                var specialGift = mallet.Prize != null ? GameService.GetSpecialGiftForEliminatedPrize(mallet.Prize) : null;
+                
+                if (specialGift != null)
+                {
+                    // Show special gift and wait for user to close it
+                    currentSpecialGift = specialGift;
+                    showSpecialGift = true;
+                    GameService.AddWonSpecialGift(specialGift);
+                    StateHasChanged();
+                    
+                    // Wait for user to close the special gift popup
+                    while (showSpecialGift)
+                    {
+                        await Task.Delay(100);
+                    }
+                    
+                    await Task.Delay(500);
+                }
+                
+                // Show prize animation
+                currentPrize = mallet.Prize;
+                showPrizeAnimation = true;
+                StateHasChanged();
+                
+                // Wait for animation display
+                await Task.Delay(2500);
+                
+                showPrizeAnimation = false;
+                statusMessage = $"Coffret #{malletNumber}: {mallet.Prize?.Name}";
+                prizes = GameService.GetRemainingPrizes();
+                StateHasChanged();
+
+                await Task.Delay(1500);
+
+                // First check if there's a banker offer to make
+                if (GameService.CanMakeOffer())
+                {
+                    ShowBankerOffer();
+                }
+                // After opening last mallet, check if game is over (no more mallets to open)
+                else if (GameService.GetRemainingMallets().Count == 0)
+                {
+                    await Task.Delay(500);
+                    EndGame();
+                }
+                else
+                {
+                    statusMessage = "Continue! Ouvre un autre coffret.";
+                }
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task RevealLastMallet()
+    {
+        var lastMallet = GameService.GetLastRemainingMallet();
+        if (lastMallet != null)
+        {
+            statusMessage = "Dernier coffret! Voyons ce qu'il reste...";
+            StateHasChanged();
+            await Task.Delay(2000);
+
+            // Open the last mallet
+            if (GameService.OpenMallet(lastMallet.Number))
+            {
+                mallets = GameService.GetMallets();
+                
+                // Show prize animation
+                currentPrize = lastMallet.Prize;
+                showPrizeAnimation = true;
+                StateHasChanged();
+                
+                await Task.Delay(2500);
+                
+                showPrizeAnimation = false;
+                statusMessage = $"Le dernier coffret contenait: {lastMallet.Prize?.Name}";
+                prizes = GameService.GetRemainingPrizes();
+                StateHasChanged();
+                
+                await Task.Delay(2000);
+            }
+        }
+        
+        EndGame();
+    }
+
+    private void ShowBankerOffer()
+    {
+        currentOffer = GameService.GenerateBankerOffer();
+        
+        if (currentOffer == null)
+        {
+            // No offer to make, continue game
+            statusMessage = "Continue! Ouvre un autre coffret.";
+            return;
+        }
+        
+        currentState = GameState.BankerOffer;
+        showBankerOffer = true;
+        statusMessage = $"📞 Le Banquier appelle! {currentOffer.Message}";
+        StateHasChanged();
+    }
+
+    private void AcceptOffer()
+    {
+        if (currentOffer == null) return;
+
+        showBankerOffer = false;
+        showUndoOffer = true;
+        acceptedOfferMessage = currentOffer.Message;
+        var wonSpecialGifts = GameService.GetWonSpecialGifts();
+        
+        if (wonSpecialGifts.Any())
+        {
+            var specialGiftsText = string.Join(", ", wonSpecialGifts.Select(g => g.Name));
+            statusMessage = $"🎉 Tu as gagné {currentOffer.Message} + BONUS: {specialGiftsText}!";
+        }
+        else
+        {
+            statusMessage = $"🎉 Joyeux Anniversaire! Tu as gagné {currentOffer.Message}!";
+        }
+        StateHasChanged();
+    }
+
+    private void ConfirmAcceptOffer()
+    {
+        showUndoOffer = false;
+        currentState = GameState.GameOver;
+        StateHasChanged();
+    }
+
+    private async void UndoAcceptOffer()
+    {
+        showUndoOffer = false;
+        acceptedOfferMessage = null;
+        currentState = GameState.OpeningMallets;
+        statusMessage = "Tu refuses l'offre! Continue à ouvrir des coffrets.";
+        StateHasChanged();
+    }
+
+    private async void RejectOffer()
+    {
+        showBankerOffer = false;
+        currentState = GameState.OpeningMallets;
+        statusMessage = "Tu refuses l'offre! Continue à ouvrir des coffrets.";
+        StateHasChanged();
+    }
+
+    private void EndGame()
+    {
+        currentState = GameState.GameOver;
+        showFinalWinning = true;
+        statusMessage = "Jeu terminé!";
+        StateHasChanged();
+    }
+
+    private enum GameState
+    {
+        SelectingPlayerMallet,
+        OpeningMallets,
+        BankerOffer,
+        GameOver
+    }
+}
