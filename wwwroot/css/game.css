@@ -457,6 +457,8 @@ html, body {
     text-shadow: 0 0 30px var(--dond-gold), 0 0 60px rgba(255, 215, 0, 0.5);
     animation: pulse-text 1.5s ease-in-out infinite;
     line-height: 1.3;
+    text-decoration: line-through;
+
 }
 
 @keyframes pulse-text {
