@@ -1,97 +1,58 @@
-# 12 — Monetization & Metrics
+# 12 — Monetization & Metrics *(v2: side-project economics)*
 
-## Principle
+## The goal is different now
 
-**Users never pay to browse or to join a free outing.** Both sides of the marketplace need
-to be dense before either is worth monetizing, and a paywall on discovery kills the density
-you're trying to build. Revenue comes from businesses who get measurable customers, plus a
-thin premium tier for power users.
+This is a side project with no runway to defend and no investors to satisfy. So the honest
+objective is not "$3.3M ARR" — it is, in order:
 
-Sequence: **liquidity first, then business revenue, then transactions.** Monetizing before
-liquidity is the most common way products in this category die.
+1. **Cover its own costs** (~$10/month now, ~$375/month at 100k registered). A trivially low bar.
+2. **Pay for your time** if it works, so it can stop being a side project.
+3. **Keep the option open** that it becomes a real business.
 
----
+Optimizing for #3 at the expense of #1 is how unfunded projects die. Revenue comes late and
+cheap to build.
 
-## Revenue lines, in order of introduction
+## Sequence
 
-### 1. Business Pro subscription — the core line (Phase 3)
+**Stages 1–4 (months 1–11): no monetization at all.** You have no leverage until the catalog
+is dense and businesses see traffic. A paywall or ad on an empty app costs more in trust than
+it earns in dollars.
+
+**Stage 5–6 (months 12+), in this order — easiest first:**
+
+### 1. Business Pro — the core line, and the only one worth real effort
 
 | Tier | Price | Includes |
 |---|---|---|
-| **Free** | $0 | Claimed profile, up to 6 photos, hours, basic stats, respond to reviews |
-| **Pro** | **$39/mo** or $390/yr | Unlimited photos + video, publish sessions & events, full analytics (views, saves, direction taps, outing attendance), priority in "verified" filters, booking link, respond-first on reviews, multi-location |
-| **Multi-site** | $99–299/mo | 5+ locations, team seats, API, bulk publishing |
+| **Free** | $0 | Claimed profile, 6 photos, hours, basic stats, reply to reviews |
+| **Pro** | **$29/mo** or $290/yr | Unlimited photos + video, publish sessions/events, full analytics, booking link, priority in verified filters |
 
-Free tier must be genuinely useful — an unclaimed or crippled profile is bad for *users*,
-which is the wrong trade. Pro sells on **attribution**: "142 people got directions to you
-from Alentour last month" is worth $39 to a climbing gym, and it's a number no other channel
-gives them.
+$29 rather than v1's $39: you're a solo unknown, and the price has to be obviously worth it on
+month one. It sells on **attribution** — *"142 people got directions to you from Alentour last
+month"* is a number no other channel gives a Montréal climbing gym.
 
-**Realistic conversion:** 8–15% of claimed businesses to Pro. In a city with 3,000 claimed
-businesses, that's 240–450 × $39 ≈ **$9k–18k MRR per mature city.**
+Realistic: 8–12% of claimed businesses convert. 500 claimed × 10% × $29 ≈ **$1,450/month**.
+That covers all costs and starts paying you. 2,000 claimed ≈ **$5,800/month**, at which point
+the maths on quitting your job becomes interesting.
 
-### 2. Promoted placement (Phase 3)
+### 2. Affiliate — nearly free to add
 
-CPC or CPM, always **labeled "Sponsored"**, capped at 1 slot per 8 organic results, and
-excluded from accessibility- and safety-critical filter results. If sponsorship can push a
-genuinely worse result into a "wheelchair accessible" search, don't sell it there.
+Ticketed activities via GetYourGuide, Viator, local booking systems: 5–10% referral. A few
+hundred dollars a month at best, but it's an afternoon of work and it tells you which
+categories actually convert.
 
-Expect this to be smaller than subscriptions early — local ad budgets are tiny and the
-sales cost is high — but it scales better later. Roughly $2–5k/mo per mature city at first.
+### 3. Promoted placement — later, and carefully
 
-### 3. Paid outings commission (Phase 4)
+Always labeled "Sponsored", capped at 1 in 8 results, never in accessibility- or safety-
+filtered results. Local ad sales is high-touch work you don't have time for; treat as Stage 6+.
 
-When an operator or an experienced community host runs a paid outing: **8–12% + payment
-processing**. Only worth building when there's enough volume to justify the refund, dispute,
-chargeback, and tax machinery — that's a real operational burden, not a Stripe integration.
+### Deliberately rejected
 
-### 4. Affiliate / referral (Phase 3, low effort)
-
-Ticketed and bookable activities via GetYourGuide, Viator, and local booking systems: 5–10%
-referral. Nearly free to add; modest revenue; useful mainly as a signal of which categories
-convert.
-
-### 5. Consumer premium — "Alentour+" (Phase 4, optional)
-
-$4.99/mo: offline maps and saved lists, advanced/saved filters, unlimited lists, early
-access to popular outings, no sponsored results, a supporter badge. Expect **1–3%**
-conversion. At 1M MAU that's $50–150k/mo, which is not nothing — but treat it as upside, and
-**never gate safety features or accessibility filters behind it.**
-
-### 6. Data & partnerships (Phase 4+, carefully)
-
-Aggregate, anonymized insights to tourism boards, municipalities, and BIAs ("where do people
-actually go on rainy Saturdays"). Genuinely valuable to city planners. **Aggregate only,
-k-anonymity enforced, never individual-level, and disclosed in the privacy policy.** The
-reputational downside of getting this wrong exceeds the revenue; if in doubt, don't.
-
-### Explicitly rejected
-
-- **Charging users to join outings.** Kills the core loop.
+- **Charging users to browse or to join a free outing.** Kills the core loop.
 - **Charging businesses to be listed at all.** Destroys catalog coverage, which is the moat.
-- **Selling user location data.** Ever. This is a bright line.
-- **Meetup's organizer-fee model.** It's why Meetup's long tail died.
-
----
-
-## Unit economics at 1M MAU
-
-| | |
-|---|---|
-| Infra + AI cost | ~$0.008/MAU/mo |
-| Trust & safety + ops | ~$0.06–0.10/MAU/mo |
-| **Total variable cost** | **~$0.09/MAU/mo ≈ $1.10/MAU/yr** |
-| Business subscriptions (10 mature cities) | ~$120k/mo |
-| Promoted placement | ~$30k/mo |
-| Premium (2% × $4.99) | ~$100k/mo |
-| Affiliate + commissions | ~$25k/mo |
-| **Revenue** | **~$275k/mo (~$3.3M ARR)** |
-| **Variable cost** | **~$90k/mo** |
-| **Contribution margin** | **~67%** |
-
-Salaries, marketing, and city launches sit on top. The model works; the risk isn't margin,
-it's **whether cities reach liquidity**, which is why [02](02-scope-and-roadmap.md) insists on
-a repeatable, budgeted city playbook.
+- **Consumer premium subscription at this stage.** 1–3% of a small user base is noise, and it
+  splits your attention. Revisit past 100k registered.
+- **Selling user location data.** Ever. Bright line.
 
 ---
 
@@ -99,61 +60,56 @@ a repeatable, budgeted city playbook.
 
 ### North star
 
-> **Confirmed attendances per month** — the number of times someone actually showed up and
-> did something they found in the app.
+> **Confirmed attendances per month** once outings exist. Before that: **saves that convert to
+> a reported visit** — the "I went and did it" signal from your report-a-problem and
+> post-save prompts.
 
-It's the only metric that captures both sides of the value: discovery that led to a real
-outcome. DAU rewards addictive scrolling, which is not what this product is for; saves reward
-intent that may never convert. If you optimize one number, optimize this one.
+DAU rewards addictive scrolling, which is not what this is for.
 
-### The funnel to instrument on day one
+### What to actually watch as a solo dev
 
-```
-install → location granted → first browse → first filter applied → first save
-       → first activity detail → first outing viewed → first join/vote
-       → first ATTENDANCE → second attendance (the retention moment)
-```
+You will not maintain twelve dashboards. Pick **five numbers** and look at them weekly:
 
-Second attendance within 30 days is the single strongest predictor of long-term retention in
-comparable products. Optimize the path to it relentlessly.
+| # | Metric | Why this one | Target |
+|---|---|---|---|
+| 1 | **W4 retention** | The only honest verdict on whether the product is useful | ≥ 25% |
+| 2 | **Filter usage rate** | Validates the entire taxonomy thesis; if low, the product premise is wrong | ≥ 35% |
+| 3 | **Activities per km² in the core area** | The supply-density number that predicts everything downstream | ≥ 30 |
+| 4 | **Saves per active user per month** | Intent — the leading indicator of attendance | ≥ 5 |
+| 5 | **$/month vs. revenue** | Keeps the side project a side project and not a liability | cost < revenue by month 15 |
 
-### Dashboards
+Add, once outings ship: **rally → quorum rate** (≥50%), **no-show rate** (<20%), and
+**safety reports per 1,000 outings** (<1, each reviewed by you personally).
 
-**Demand**
-- MAU / DAU, W1 / W4 / M3 retention (by cohort **and by city**)
-- Sessions/user, filter usage rate, searches/session
-- Saves per active user, save → attendance conversion
-- Feed CTR by position, ranker version, and context
+### Stage gates
 
-**Supply**
-- Activities per km² in the active area *(the density metric that predicts retention)*
-- % with ≥ 3 photos, % claimed, % verified in the last 6 months
-- New listings/week by source (seeded / claimed / UGC)
-- **Time to first 100 impressions** for a new listing (supply-side fairness)
-- Business churn, Pro conversion
+Don't advance until the previous stage earns it:
 
-**Liquidity — watch these weekly**
-- Outings created / week, **rally → quorum rate** (target ≥ 60%)
-- Median time to quorum (< 36h)
-- Attendance rate of confirmed outings (≥ 80%), no-show rate (< 20%)
-- **Organic host rate** — % of outings not hosted by paid ambassadors (≥ 70% by month 6).
-  *This is the metric that tells you if it's a product or a subsidy.*
-- % of MAU who attended ≥ 1 outing (≥ 25%)
+| Gate | Requirement |
+|---|---|
+| Stage 1 → 2 | ≥35% filter usage · ≥25% W2 return · 10 people who say they went |
+| Stage 2 → 3 | ≥25% W4 retention · ≥5 saves/active/month |
+| Stage 3 → 4 | 50 businesses claimed manually · you can describe the enrichment pipeline from experience |
+| Stage 4 → 5 | 2,000+ activities · ≥30/km² core · 1,000+ registered |
+| Stage 5 → 6 | Outings running ≥8 weeks · zero serious incidents · moderation queue clearable in 15 min/day |
 
-**Health & cost**
-- $/MAU, LLM spend/day, candidate-cache hit rate, feed p95 latency
-- Moderation items per 1,000 MAU, queue age, decision reversal rate on appeal
-- **Safety incidents per 1,000 outings** — target < 1, every one human-reviewed. Report this
-  to the whole company monthly; make it impossible to ignore.
+### Vanity metrics to ignore
 
-### City-launch scorecard
+Total registered accounts · total listings · app-store rating in isolation · social followers.
+Each can double while the product gets worse.
 
-Before declaring a city launched: ≥ 800 activities, ≥ 30 activities/km² in the core area,
-≥ 100 claimed businesses, ≥ 15 open outings/week, and ≥ 25% W4 retention in the local cohort.
-**Don't spend acquisition money in a city that hasn't hit these.** That is how marketing
-budgets evaporate.
+---
 
-### Vanity metrics to actively ignore
+## The realistic outcome distribution
 
-Total registered users · total listings nationwide · app-store rating in isolation · page
-views · social followers. Each of these can double while the product gets worse.
+Worth being clear-eyed about, since this is your free time:
+
+- **Most likely (~60%):** you build a genuinely good Montréal activity dictionary, a few
+  thousand people use it, it costs $30/month, and it stays a thing you're proud of. That is a
+  fine outcome and the plan is designed so it's reachable in ~6 months of evenings.
+- **Good (~30%):** the catalog gets dense, businesses claim it, Pro converts, it pays for
+  itself and then some, and you decide whether to go further.
+- **Big (~10%):** outings work, it becomes the default way 18–30 Montréal plans a weekend, and
+  it stops being a side project.
+
+Every stage is independently useful, so you're never one all-or-nothing bet from zero.

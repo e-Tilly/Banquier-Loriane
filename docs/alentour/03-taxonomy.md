@@ -1,5 +1,9 @@
 # 03 — Taxonomy & Tags
 
+> **v2 changes:** audience narrowed to **18–30** — price bands, vibe tags and presets skew
+> cheap/social/late; Family & Kids stays as a category but leaves the shelves. Accessibility
+> (F6) is **demoted** to an ordinary facet of six tags. Everything else stands.
+
 This is the most important document in the plan. The tag system *is* the product; the app
 is a UI over it. Get it wrong and no amount of design saves you, because a filter that
 returns the wrong things is worse than no filter.
@@ -133,7 +137,12 @@ stored in the taxonomy table and shown on hover/tap. Example (hiking):
 - 3 — sustained climb, 400–800 m gain, 3–5 h, uneven
 - 4 — 800 m+ gain, scrambling, exposure, or > 6 h
 
-### F6. Accessibility *(tri-state, provenance-critical)*
+### F6. Accessibility *(tri-state, provenance-critical — DEMOTED in v2)*
+
+> **v2:** per your answer, accessibility is one filter among many rather than a headline
+> feature. **Cut:** the community-verification flow, the dedicated filter entry point, and the
+> 14-tag facet — now the six below. **Kept:** the tri-state model and the AI prohibition, which
+> cost nothing and prevent real harm. Retrofitting tri-state later is a migration across every row.
 
 Every value is `true` / `false` / `unknown`, with `source` and `verified_at`.
 **An AI may never set these to `true`.** It may only propose them as `unknown → suggested`,
@@ -144,25 +153,22 @@ for owner confirmation. Wrongly claiming step-free access strands someone at a d
 | `step_free_entry` | The single most-requested one |
 | `wheelchair_accessible_throughout` | Distinct from entry |
 | `accessible_washroom` | |
-| `accessible_parking` | |
-| `seating_available` | Matters for chronic pain / pregnancy / elderly, not just wheelchairs |
-| `low_sensory` / `quiet_hours` | Autism, sensory processing; quiet hours has a time range |
-| `no_loud_music` | |
-| `good_lighting` | Low vision |
-| `hearing_loop` / `asl_lsq_available` | |
-| `audio_description` / `braille_signage` | |
+| `seating_available` | Chronic pain, pregnancy, fatigue — not just wheelchair users |
+| `low_sensory` | Autism, sensory processing |
 | `service_animals_welcome` | Legally distinct from pet-friendly — keep separate |
-| `elevator_available` | |
-| `accessible_transit_nearby` | Derived |
-| `staff_trained_accessibility` | Owner claim only |
+
+*(The other eight from v1 — `accessible_parking`, `hearing_loop`, `asl_lsq_available`,
+`audio_description`, `braille_signage`, `elevator_available`, `good_lighting`,
+`staff_trained_accessibility` — are dropped from the shipped facet. The slugs are reserved in
+the taxonomy file so they can be re-enabled without a migration.)*
 
 Also `accessibility_notes_i18n` free text (displayed, not filterable) — real accessibility
 is full of caveats that no boolean captures.
 
-> Ship a **community accessibility verification** flow early: a user who is there can
-> confirm or dispute a claim with a photo. Two independent confirmations promote
-> `owner_claimed → community_verified`. This is high trust value at near-zero cost, and
-> the disability community will do it enthusiastically if you make it respectful.
+> **Cut in v2:** the community accessibility verification flow (photo-confirm, two-confirmation
+> promotion). It needs a user base you won't have for a year. Revisit if the app grows — it is
+> high trust value at near-zero cost, and the disability community engages with it
+> enthusiastically when it's done respectfully.
 
 ### F7. Season, weather & timing
 
@@ -263,14 +269,15 @@ Deep taxonomies die of their own UI. Rules:
   is behind a bottom sheet organized by facet, with counts on every option.
 - **Live result counts** on every filter option, computed from the current candidate set.
   Never let someone tap into an empty state.
-- **Presets are the real UI.** "With kids", "Rainy day", "Cheap date", "Alone and restless",
-  "Sporty", "Accessible". A preset is a saved filter bundle; ship ~8 curated and let users
+- **Presets are the real UI**, tuned to 18–30: "Free tonight", "Cheap date", "Rainy day",
+  "Alone and restless", "New in town", "Hungover", "Impress a visitor", "Get moving".
+  ("With kids" exists but is not a launch preset.) A preset is a saved filter bundle; ship ~8 curated and let users
   save their own. Most users will never open the full filter sheet — that's fine, and it's
   why the sheet can afford to be deep.
-- **Accessibility filters get a dedicated, prominent entry point**, not buried at position
-  9 in a sheet. And when accessibility filters are on, `unknown` results are shown in a
-  clearly separated "not yet verified" section rather than dropped — dropping them hides
-  the majority of the catalog and is worse for the user than an honest label.
+- **Accessibility lives in the filter sheet like any other facet** (v2 demotion). The one rule
+  that survives: when an accessibility filter is on, `unknown` results appear in a clearly
+  separated "not yet verified" section rather than being dropped — dropping them hides most of
+  the catalog and is worse for the user than an honest label.
 - **Never zero.** Relax the least-important filter and say so: *"No exact matches. Showing
   12 results ignoring 'wheelchair accessible' — [keep it strict]."*
 

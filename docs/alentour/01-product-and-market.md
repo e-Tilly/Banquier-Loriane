@@ -18,7 +18,11 @@ Nobody covers all three. That gap is the product.
 
 ## Who it's for
 
-**Primary — "the restless local," 22–40, urban.** Has money and time but a thin
+> **v2 audience lock: Montréal, 18–30.** The personas below are narrowed accordingly — the
+> weekend-planner/parent persona is now out of scope as a design target (keep the Family &
+> Kids category in the catalog; drop it from the shelves and the marketing).
+
+**Primary — "the restless local," 18–30, urban.** Has money and time but a thin
 repertoire; defaults to the same three bars. Motivated by novelty and by not being bored.
 Acquisition: this is the person who screenshots and shares "look at this" — the app must
 be screenshot-worthy.
@@ -28,9 +32,15 @@ new job, post-breakup). Has the highest willingness to meet strangers and the hi
 pain. Small in number but *enormously* high intent, and the best possible seed cohort for
 the group feature. This cohort is why Timeleft and Bumble BFF exist.
 
-**Secondary — "the weekend planner / parent."** Needs "what can I do with a 7-year-old on
-a rainy Sunday within 20 minutes." Low frequency, very high retention if it works once.
-Filters (age suitability, indoor, duration) matter more to them than the social feature.
+**Deprioritized — "the weekend planner / parent."** Real, valuable, and *not your audience*.
+Their needs (age suitability, stroller access, nap-window durations) pull the taxonomy in a
+direction 18–30 doesn't need. Serve them incidentally, design for them never.
+
+**What 18–30 in Montréal specifically implies:** heavily price-sensitive (free and sub-$20
+dominate), largely car-free (transit/bike/walk matters, parking barely does), late hours are
+normal, French and English both required, student status is a live discount, and the social
+motivation is strongest in exactly this band — which is why outings still earn a place in the
+plan even as a Stage 5 feature.
 
 **Supply side — "the small operator."** Climbing gym, pottery studio, kayak rental, escape
 room, community centre, independent guide. Has an Instagram, has no website worth the

@@ -1,162 +1,114 @@
-# 08 — Trust, Safety & Moderation
+# 08 — Trust, Safety & Moderation *(v2: constraint instead of staffing)*
 
-You are building a product where strangers meet strangers in physical space. **One serious
-incident, handled badly, ends the company.** This is not a phase-3 concern; it ships with
-outings or outings don't ship.
+The v1 plan assumed 8–12 moderators and 24/7 triage. **You have none of that.** So safety here
+is achieved by *narrowing what the product allows*, not by supervising what people do with it.
 
-Two separate problem spaces, often conflated:
+That is a legitimate strategy — it is how small products ship social features responsibly —
+but it only works if the constraints are real, enforced in code, and not quietly relaxed when
+growth stalls.
 
-- **Content safety** — is this listing real, accurate, legal, non-spam?
-- **People safety** — is it safe to meet this person at this place at this time?
+## Your single biggest safety asset: 18+
 
----
+Your audience is 18–30, so the minimum age is **18**, and that deletes an enormous amount of
+work and risk:
 
-## People safety
+- No minor-protection rules, no age-gating of alcohol venues, no mandated-reporting playbook,
+  no "under-18s can't see attendee lists", no parental-consent regime.
+- Enforce with a date-of-birth gate at signup (store the **year only** — you never need more)
+  plus a terms attestation. Not bulletproof, but proportionate and standard.
 
-### Trust levels
+## Stage-gated exposure
 
-A single `trust_level` on the user drives capability gates throughout the app.
+Most of this document does not apply until Stage 5, ~month 12. Until then the product is a
+read-only catalog with device-local saves, whose entire safety surface is "is the listing
+accurate."
 
-| Level | Earned by | Can |
+| Stage | Social surface | Moderation load |
 |---|---|---|
-| 0 — new | Signup | Browse, save, join *public* outings hosted by L2+ |
-| 1 — verified | Email + phone verified, profile complete | Join any open outing, create rallies (max 3 open) |
-| 2 — established | 2 attended outings, no upheld reports, account ≥ 14 days | Host outings up to 8 people, create activities that publish immediately |
-| 3 — trusted | 8 attended, hosted ≥ 2, ID-verified | Host larger outings, host `risk_tier 2` activities, community moderation queue access |
-| −1 — restricted | Upheld report, or no-show pattern | Read-only social; can appeal |
+| 1 — Catalog, no backend | None. No accounts, no UGC. | Zero |
+| 2 — Accounts & sync | Saves only, private | Near zero |
+| 3–4 — Business claims, AI enrichment | Owner-submitted content | Low — you review every claim personally |
+| 5 — Outings | **Strangers meeting in person** | The real thing |
+| 6 — UGC activities | User-authored listings | Moderate, automatable |
 
-Progression must be **visible and achievable** — show "1 more outing to unlock hosting".
-Invisible gates read as bugs.
-
-### Verification ladder
-
-- **Phone (SMS)** — cheap, blocks casual repeat abuse. Required for any social action.
-- **Email + Apple/Google identity** — baseline.
-- **ID verification** (Stripe Identity, Persona, or Veriff, ~$1–1.50/check) — *optional for
-  attendees, required for hosts of paid outings, `risk_tier ≥ 2` outings, and outings > 12
-  people.* Badged, not mandatory: forcing ID on everyone kills signup and excludes people
-  without documents, which disproportionately hits exactly the newcomers you're trying to
-  serve. Store the *result*, never the document images.
-- **Selfie-match to profile photo** — optional badge, meaningfully reduces catfishing.
-
-### Meeting-safety design (product features, not policy text)
-
-- **Public meeting points only.** `outings.meeting_point` must resolve to a public venue or a
-  known POI. Block residential addresses. This one constraint prevents a large class of harm.
-- **Exact address disclosed at T−2h**, and only to confirmed participants. Approximate area
-  before that.
-- **"Share your plans"** — one tap sends a trusted contact the activity, venue, time, and a
-  live-ish check-in link. No account needed for the recipient. This is table stakes now, and
-  users notice its absence.
-- **Check-in / check-out** with an optional "I'm home safe" prompt.
-- **In-app contact only until the outing confirms.** No phone numbers, no Instagram handles
-  exchanged in-app before that; strip contact info from pre-confirmation messages.
-- **Blocks are total and silent.** A blocked user cannot see, join, or be shown your outings,
-  and gets no signal that a block occurred. Block propagation must be enforced in the
-  *candidate generation query*, not filtered in the client.
-- **One-tap report from every surface** — profile, outing, message, photo, review. Under 3
-  taps, always. Reporting flows that are hard to find don't get used.
-- **Emergency resources** in the safety centre, localized per city.
-- **A "leave" that isn't awkward.** A discreet in-app way to exit an outing early and mark
-  discomfort, which routes to review without a confrontation.
-
-### Incident response — write this before you need it
-
-- **24/7 triage for `severity ≥ 3`** (physical harm, threats, minors, sexual misconduct).
-  At small scale this is a phone that wakes someone up. That's acceptable; having no such
-  phone is not.
-- Published SLA: acknowledge < 4h, resolve or escalate < 24h for high severity.
-- A written escalation playbook: what gets law enforcement contacted, who decides, who
-  speaks. Rehearse it once.
-- **Preserve evidence on report** — snapshot the reported content immediately; deletion by
-  the reported user must not destroy it.
-- Appeals for every enforcement action, reviewed by a different human.
-- **Transparency reporting** from year one. It builds the trust you'll need on your worst day.
-
-### Not a dating app — enforced, not just stated
-
-See [06](06-groups-and-outings.md). Concretely: no swipe UI, no browsing attendees by photo,
-no romantic-intent filters, zero tolerance for unsolicited advances (first offence = warning
-+ visible record; second = restriction). Publish the norm in onboarding so enforcement isn't
-a surprise.
-
-### Minors
-
-- Minimum age 16 (A6). Hosting requires 18+.
-- Age-gate: activities tagged `adults_only`, `alcohol_served`, or `min_age_legal ≥ 18` are
-  hidden from and unjoinable by under-18 accounts.
-- Under-18s cannot join outings hosted by unverified individuals, and cannot appear in
-  attendee lists to non-participants.
-- Any report involving a minor is automatically `severity 4`, human-reviewed, with a mandated
-  reporting path defined in the playbook.
+**Do not skip ahead.** Shipping outings before the catalog is dense is bad product *and* bad
+risk management — it front-loads your only dangerous feature.
 
 ---
 
-## Content safety & moderation
+## The constraints that replace moderators (Stage 5)
 
-### The pipeline
+Every one of these is enforced in code, not policy text:
+
+1. **18+ only.** As above.
+2. **Venue-anchored outings only.** An outing must attach to a listed public venue from the
+   catalog. No user-chosen meeting points, no free-text addresses, no residential locations.
+   One constraint, an entire class of harm removed.
+3. **Phone verification** to join any outing. Cheap (~$0.01/SMS), and it stops casual repeat
+   abuse better than anything else at this budget.
+4. **Max 8 attendees.** Small enough to stay social; small enough to limit blast radius.
+5. **No DMs.** Outing-scoped chat only, opening at confirmation, read-only 48h after, purged
+   at 90 days. 1:1 chat only after mutual post-outing opt-in — and not before Stage 6.
+6. **Blocks are total, silent, and enforced in the query.** A blocked user cannot see, join,
+   or be shown your outings, and gets no signal. Filtering client-side is a data leak.
+7. **Fail-safe reporting.** A report **auto-pauses** the outing and notifies participants
+   pending your review — rather than sitting in a queue until you wake up. Conservative
+   defaults are the only correct choice for a solo operator.
+8. **Rate limits** on outing creation, joins, and messages, per user and per device.
+
+## Automated moderation
+
+Cheap enough to run on everything, so run it on everything:
 
 ```
-UGC (listing, photo, review, message, profile)
-  → [1] Deterministic checks: rate limits, blocklists, link/contact-info rules, dup hash
-  → [2] Automated classification — Claude Haiku 4.5, structured output
-        {sexual, violence, harassment, hate, self_harm, illegal, spam, pii,
-         off_topic, dangerous_activity, commercial_spam} each 0–1
-        + image safety on every photo
-  → [3] Risk score → route:
-        low     → publish
-        medium  → publish + queue for review (soft)
-        high    → hold, publish only after human review
-        critical→ block + auto-restrict + alert
-  → [4] Human queue, SLA by severity
-  → [5] Every decision logged to moderation_decisions (append-only) with model version
-        and scores, so you can audit and re-run when a threshold changes
+UGC (message, listing, review, profile text, photo)
+ → [1] Deterministic: rate limits, link/contact-info rules, duplicate hashing   ($0)
+ → [2] Claude Haiku 4.5, structured output: {harassment, sexual, violence, hate,
+       self_harm, illegal, spam, pii, dangerous_activity} each 0–1               (~$0.0003/item)
+ → [3] Route: low → publish · medium → publish + flag for you · high → hold
+       critical → block + auto-restrict + email you immediately
+ → [4] Log every decision (append-only, with model version and scores)
 ```
 
-**Cost:** an outing message is ~200 input tokens. At 1M MAU and ~1M moderated items/month,
-Haiku 4.5 at $1/MTok input is roughly **$300/month**. Cheap enough that you should moderate
-*everything*, not sample.
+At 220k MAU and ~1M moderated items/month this is **~$200/month**. Layer 1 catches the
+highest-volume junk at zero cost — never let the LLM be the only thing between a user and harm.
 
-**Do not moderate with an LLM alone.** Layer 1's deterministic rules catch the highest-volume
-abuse (link spam, repeated text, contact-info harvesting) at zero marginal cost, and layer 2
-should never be the only thing between a user and harm.
+**Your queue must stay small enough for one person.** Tune thresholds so you see ~10–20 items
+a day, not 200. If the queue grows past what you can clear in 15 minutes daily, tighten the
+automated thresholds — accept more false positives — rather than letting it rot.
 
-### Content-specific rules
+## Incident response, solo
 
-- **Photos:** EXIF stripped on upload (GPS!), NSFW/violence classifier, no photos of
-  identifiable people without consent in *user-submitted* listing photos, no photos of minors
-  in UGC listings.
-- **Reviews:** verified-attendance reviews ranked first and badged. One review per user per
-  activity. Owner right of reply, no owner deletion. Detect and act on review brigading
-  (velocity + account-age + graph clustering).
-- **Listings:** no MLM, no unlicensed regulated services (medical, financial), no adult
-  services, no prohibited dangerous activities, no political/religious recruitment disguised
-  as an activity. Write this list *before* UGC opens, and put it in the ToS.
-- **Duplicate/spam listings:** embedding + trigram similarity at creation ([07](07-supply-onboarding-and-ai.md)).
+Write this before you need it. One page.
 
-### Catalog accuracy — a safety issue, not just a quality one
+- **Severity 3+ (physical harm, threats, sexual misconduct): push notification to your phone,
+  immediately.** Not an email digest.
+- Published response times you can actually meet: acknowledge < 24h, resolve < 72h. **Promise
+  less than a funded company and meet it**, rather than promising parity and failing.
+- Preserve evidence on report — snapshot immediately; deletion by the reported user must not
+  destroy it.
+- A written escalation note: what gets police involved, and the SPVM non-emergency number.
+- If you are away for more than a few days with outings live, **pause new outing creation**.
+  Build that switch on day one.
 
-Wrong hours waste an evening. **Wrong accessibility information strands someone.** Wrong
-price/difficulty on a `risk_tier 2` activity gets someone hurt.
+> **The honest statement.** Strangers meeting strangers, organized by one part-time person, is
+> the riskiest thing in this plan. The constraints above are real mitigations, but they are
+> constraints, not supervision. If outings ever outrun what you can personally watch, turning
+> the feature off and keeping the dictionary is a correct decision, not a failure.
 
-- Accessibility claims: owner-confirmed or community-verified only, never AI ([03](03-taxonomy.md),
-  [07](07-supply-onboarding-and-ai.md)).
-- `last_verified_at` shown in the UI when > 6 months.
-- "Report a problem" on every listing, with fast-path reasons: *closed permanently · wrong
-  hours · wrong price · wrong accessibility · doesn't exist · dangerous*.
-- Owner nudge every 90 days: "still accurate?" — one tap to confirm.
+---
+
+## Content accuracy — the part that matters from day one
+
+With no UGC and no outings, Stage 1's entire safety surface is **is the catalog true**. Wrong
+hours waste someone's evening; a permanently-closed venue destroys trust in the whole app.
+
+- `last_verified_at` shown in the UI when older than 6 months.
+- "Report a problem" on every listing with fast reasons: *closed · wrong hours · wrong price ·
+  wrong accessibility · doesn't exist · dangerous*. This is your entire moderation system in
+  Stage 1, and it works.
+- Owner nudge every 90 days once claims exist (Stage 3): one tap to confirm.
 - Auto-demote anything unverified for 12 months.
-
-### Moderation tooling
-
-Build a real internal tool in Phase 2 — not Retool forever, and definitely not psql. It needs:
-queue with severity sort and SLA timers, full context on one screen (the content, the
-reporter, the reported user's history, related reports), one-click actions with mandatory
-reason codes, an append-only audit log, and appeal handling. Moderation quality is bounded by
-tool quality, and a bad tool guarantees inconsistent decisions.
-
-**Staffing:** roughly 1 FTE moderator per 50–100k MAU for a product with this much UGC and
-in-person risk, plus on-call rotation for severity 3+. At 1M MAU budget 8–12 FTE or an
-outsourced partner with a well-specified playbook and your own QA sampling on top. This is a
-real line item in [10](10-cost-model.md) — moderation is usually a larger cost than the
-infrastructure it moderates, and plans that omit it are wrong by an order of magnitude.
+- **Accessibility claims are never AI-asserted** — still true even though the facet is demoted
+  ([03](03-taxonomy.md)). A wrongly-claimed step-free entrance strands somebody, and that
+  remains the one place where a hallucination causes direct physical harm.

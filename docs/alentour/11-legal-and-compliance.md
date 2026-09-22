@@ -1,5 +1,10 @@
 # 11 — Legal, Privacy & Compliance
 
+> **v2 changes:** minimum age **18** removes the minor-protection regime entirely; paid
+> ambassadors are gone (and with them the employment-classification question), replaced by an
+> AI-disclosure duty. Law 25 obligations are unchanged — and *lighter in practice* through
+> Stage 1, which stores no personal data at all.
+
 **Not legal advice.** This is an engineering-side checklist of what to build and what to
 take to counsel. Given assumption A1 (Québec launch), several of these are unusually strict
 and unusually cheap to handle now versus later.
@@ -63,9 +68,12 @@ Users will get hurt doing activities they found in your app. Plan for it.
    versioned waiver text; store `waiver_version` and `accepted_at` per participant
    ([04](04-data-model.md)). Waiver enforceability varies by province/state — get local counsel.
 3. **`risk_tier 3` cannot be community-hosted at all** — verified operator only.
-4. **Ambassador classification.** Paid ambassadors ([06](06-groups-and-outings.md)) can create
-   employment/contractor exposure and blur the facilitator position. Structure with counsel:
-   fixed stipends, no direction of manner and means, clear independent-contractor terms.
+4. **~~Ambassador classification~~ — moot in v2.** There are no paid ambassadors, so the
+   employment/contractor exposure disappears. The replacement raises a different duty:
+   **the AI concierge must never be presented as a person or an attendee**
+   ([06](06-groups-and-outings.md)). Fabricated participation in a gathering people physically
+   attend is a deceptive practice in most consumer-protection regimes, and no growth benefit
+   is worth it. Disclose that invitations and scheduling are automated.
 5. **Insurance:** general liability, tech E&O, cyber. Get quotes before Phase 2 launches;
    underwriters will ask precisely the questions above and their answers will tell you where
    your policies are weak.
@@ -73,8 +81,11 @@ Users will get hurt doing activities they found in your app. Plan for it.
    accessibility legislation and, more importantly, harms someone. Owner/community-verified
    only, with a visible "last verified" date and a fast correction path
    ([03](03-taxonomy.md), [08](08-trust-safety-and-moderation.md)).
-7. **Minors** — see [08](08-trust-safety-and-moderation.md). Age gates, no adult-tagged
-   activities, mandated-reporting playbook.
+7. **Minors — largely designed out in v2.** Minimum age is **18** (audience is 18–30), which
+   removes age-gating of alcohol/adult venues, the mandated-reporting playbook, and
+   attendee-list restrictions. Enforce with a date-of-birth gate at signup storing the **year
+   only**, plus a terms attestation. This is one of the largest risk-and-work reductions
+   available to you, and it came free with the audience decision.
 
 ## Content & IP
 
@@ -125,5 +136,7 @@ Users will get hurt doing activities they found in your app. Plan for it.
 - [ ] Deletion + export flows implemented and tested end-to-end
 - [ ] Store privacy labels accurate and matching what the app actually does
 - [ ] Open-data attribution screen shipped
-- [ ] Insurance bound before Phase 2 (outings) opens
+- [ ] Insurance quoted before Stage 5 (outings) opens — general liability at minimum. Get
+      quotes early: underwriters ask exactly the questions in this document, and their
+      reaction tells you where your posture is weak.
 - [ ] Moderation playbook, escalation ladder, and law-enforcement request policy written

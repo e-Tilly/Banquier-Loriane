@@ -65,8 +65,12 @@ one boring map pin. You get eight browsable, filterable, individually-taggable t
 
 Do the explode with an LLM prompted over the POI + its Wikipedia/Wikidata entry + the
 municipal dataset description, constrained to the taxonomy, and **hold everything below a
-confidence threshold for human review**. Budget ~200 human-review hours per launch city and
-treat it as a fixed launch cost.
+confidence threshold for human review**.
+
+> **v2 scale:** you are not seeding a city, you are seeding **two neighbourhoods — 300–500
+> activities**. At ~$0.14 each via the Batch API that is **~$70**, and the human review is
+> ~30 hours of your own time rather than 200 hours of someone else's. Run the pipeline as a
+> batch job from your laptop; it does not need to be a deployed service until Stage 4.
 
 **Seeded listings publish as `unclaimed`, clearly labelled "Not yet verified", with no
 accessibility claims set to `true` and no AI-written marketing prose** — just facts. A
@@ -94,13 +98,14 @@ account, and the platform hands you their content through a supported API:
 | **Facebook Page** | Same Meta Business Login | Owner must be a Page admin. Gets name, about, hours, category, photos, events. |
 | **TikTok** | Login Kit + Display API (`user.info.basic`, `video.list`) | Returns the authenticated user's own videos + metadata. App review required. |
 | **Google Business Profile** | Google Business Profile API, owner OAuth | **The owner must already have claimed the listing**, and *you* must apply to Google for API access — a real gate with a real approval queue. Apply early; it is a long pole. |
-| **Website** | Server-side fetch of a URL the owner supplies, respecting `robots.txt` | The universal fallback. Works for the 40% with no usable social presence. |
+| **Website** | Server-side fetch of a URL the owner supplies, respecting `robots.txt` | **The v2 primary path.** Works for the 40% with no usable social presence, and needs nobody's approval. |
 | **Camera roll** | Plain upload | Always available; never assume the social path works. |
 
-**Plan for the fallback to be the primary path at first.** Meta app review will not be
-approved on day one, and a meaningful share of small operators have a personal IG account
-they will not convert. The onboarding must be excellent with *only* a website URL and six
-photos from a phone.
+**In v2 the fallback *is* the path, through Stage 5.** Meta app review is 2–4 weeks of
+calendar time you don't control, and Google Business Profile API access needs a separate
+application with its own queue. Nothing on a solo critical path may depend on someone else's
+review board. Build social OAuth import when the app is live and the owner demand is proven —
+not before. The onboarding must be excellent with *only* a website URL and six phone photos.
 
 ### Media rights — do this properly
 
@@ -231,6 +236,9 @@ queue from day one. It's rare and it's always a mess.
 ## 3. User-created activities
 
 The community knows about the swimming hole, the free Tuesday, the sledding hill.
+
+**Not before Stage 6 (~month 18).** UGC without a moderation stack degrades the catalog you
+spent a year building, and catalog trust is very hard to win back.
 
 **Creation flow (must be under 90 seconds):** photo → pin on map → title → category → 3
 suggested tags to confirm → post. AI fills the rest from the photo and title and proposes

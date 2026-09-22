@@ -1,102 +1,121 @@
-# 09 — Architecture & Stack
+# 09 — Architecture & Stack *(v2: free, solo, no-rework)*
 
-## Principles
+## Two requirements in tension, and how they're reconciled
 
-1. **Boring, well-understood technology.** A 4-person team cannot operate a distributed
-   system. One Postgres, one API service, one queue.
-2. **Prefer things whose cost scales with *usage*, not with *users*.** This single rule is
-   why the stack below costs ~$8k/month at 1M MAU instead of ~$60k ([10](10-cost-model.md)).
-3. **No lock-in on the data layer.** Managed platforms are fine for speed as long as the
-   escape hatch is "it's just Postgres".
-4. **Every hot path must be cacheable by something other than the user's identity.**
+1. **Free until launch, near-free in beta.**
+2. **Fully functional, with no excessive rework later.**
 
-## The stack
+These are usually in conflict — the cheap thing (Firebase free tier, a no-code backend, a
+static site generator) is the thing you throw away. **They are reconcilable here because the
+cheap stack and the scalable stack are the same stack.** Postgres, R2, and MapLibre cost $0 at
+zero users and ~$2,000/month at a million registered accounts. Nothing gets thrown away.
 
-| Layer | Choice | Why, and what it beats |
-|---|---|---|
-| **Mobile** | **React Native + Expo** (EAS Build, EAS Update) | One codebase, OTA updates without app-review round-trips (worth weeks per year), a small team can ship both platforms. Flutter is equally fine; native ×2 is not, at this size. |
-| **Maps rendering** | **MapLibre Native** + **Protomaps** basemap (`.pmtiles` on R2 behind Cloudflare) | Flat, tiny cost. Mapbox bills mobile maps **per monthly active user** — the one pricing axis that scales exactly with the thing you're trying to grow. See [10](10-cost-model.md). |
-| **Geocoding / autocomplete** | Self-hosted **Photon**/Nominatim, or Geoapify/Radar; Google Places only in the business-onboarding address field | Avoids the Places caching prohibition ([07](07-supply-onboarding-and-ai.md)) |
-| **Backend API** | **TypeScript**, Fastify or NestJS, REST + a thin BFF for the feed | Type sharing with the RN app is a genuine velocity win. Move a hot path to Go later only if profiling says so. |
-| **Database** | **PostgreSQL 16 + PostGIS + pgvector + pg_trgm** | Geo, relational, full-text, vector, and JSON in one engine. Replaces what would otherwise be Postgres + Elasticsearch + Pinecone + a geo service. |
-| **Platform (phases 0–2)** | **Supabase Pro** — Postgres, auth, storage, realtime, RLS | Fastest path to a working product. It *is* Postgres, so the exit is a `pg_dump`. Plan the exit; don't take it early. |
-| **Platform (phase 3+)** | Managed Postgres (Crunchy / RDS / Neon) + own API on Fly.io or Hetzner | Migrate when the platform's usage pricing exceeds the ops cost of running it — realistically around 200–400k MAU. |
-| **Cache / queue** | **Redis** (Upstash or self-hosted) + **pg-boss** or BullMQ | Candidate-set cache, rate limits, job queue. pg-boss keeps jobs in Postgres — one fewer thing to operate. |
-| **Object storage + CDN** | **Cloudflare R2** + Cloudflare CDN; **imgproxy** or Cloudflare Images for variants | **$0 egress.** At 1M MAU image bandwidth is the single largest infra line on S3/CloudFront and it is ~free here. This is the highest-leverage choice in the document. |
-| **Search (later)** | **Typesense** self-hosted (3 small nodes) when Postgres FTS stops being enough | Typo tolerance + fast facet counts. Algolia is excellent and prices per search — untenable at this volume. |
-| **Realtime** | Supabase Realtime early → **Centrifugo** self-hosted later | Outing chat only. Per-connection SaaS (Pusher/Ably) is a cost trap at 1M users. |
-| **Push** | Expo Push → FCM/APNs directly | Free. Push cost should be ~$0; if it isn't, something is wrong. |
-| **AI** | **Claude Opus 5** (extraction, copy) + **Claude Haiku 4.5** (triage, moderation, NL parse); **Voyage AI** or self-hosted BGE-M3 for embeddings | Anthropic has no embeddings endpoint — use Voyage or self-host. See [07](07-supply-onboarding-and-ai.md). |
-| **Auth** | Supabase Auth / Clerk early; consider own later | Sign in with Apple is mandatory if you offer any other social sign-in on iOS. |
-| **Analytics** | **PostHog** (cloud, then self-hosted) + **Sentry** | Product analytics, session replay, feature flags, A/B in one. Self-host when event volume makes cloud pricing bite. |
-| **Weather** | OpenWeather / Environment Canada, one call per city per hour, cached | Powers context ranking. Negligible cost — never call it per user. |
-| **CI/CD** | GitHub Actions + EAS | |
-| **IaC** | Terraform for the non-Supabase pieces | |
+The one real deferral is that **Stage 1 has no backend at all** — and that's a deferral, not a
+detour, because the catalog file is generated from the Postgres schema you'll later put online.
 
-## Shape
+---
+
+## Stage 1: the app is a file on a CDN
 
 ```
-   iOS / Android (Expo RN)
-        │  HTTPS (JSON), deep links, push
-        ▼
-   Cloudflare  ── CDN for media (R2) and map tiles (PMTiles)
-        │
-        ▼
-   API service (Fastify, 4–12 stateless containers, autoscaled)
-        ├── Redis: candidate-set cache, rate limits, sessions, NL-query cache
-        ├── Postgres primary (writes) ──► 2 read replicas (feed, search)
-        ├── pg-boss workers: enrichment, rally deadlines, reminders,
-        │                    moderation, imports, digests, expiry
-        └── Anthropic API (async only — never in a user-blocking request)
+  Local Postgres (your laptop, never deployed)
+     │   the real schema from doc 04 — authored once, used forever
+     │   export script (a ~100-line Node/TS file)
+     ▼
+  catalog.v1.json  (~3 MB, ~700 KB gzipped)  ─┐
+  montreal.pmtiles (~200 MB, built once)     ─┤──►  Cloudflare R2 + CDN  ──►  Expo app
+  media/*.webp     (~300 MB)                 ─┘                               on-device filter
+                                                                              on-device map
 ```
 
-**Rule: no LLM call is ever in a user-blocking request path.** Enrichment is queued;
-moderation is queued-with-optimistic-publish; NL search is cached and falls back to plain
-filters on timeout. This bounds both latency and cost, and it means an API outage degrades
-the product instead of breaking it.
+**Why this is right, not a shortcut:**
 
-## Scaling path
+| | |
+|---|---|
+| **Cost** | R2 free tier: 10 GB storage, 10M reads/month. Serves ~100k users at $0. |
+| **Speed** | Filtering 2,000 rows in JS is sub-millisecond. Faster than any network call. |
+| **Offline** | Works in the metro, which is where people plan. A real feature, not a consolation. |
+| **Ops** | Nothing to deploy, monitor, scale, patch, or wake at 3am. |
+| **Updates** | Upload a file. New catalog live in seconds, no app release. |
+| **Rework** | None. The schema is already the production schema. |
 
-| Stage | MAU | What changes |
+**When you outgrow it:** ~5,000 activities or ~8 MB. That's a year away. Then you either split
+by neighbourhood (fetch only the cells the user is near) or move the catalog behind the API —
+by which point you have a backend anyway.
+
+---
+
+## The stack, by stage
+
+| Layer | Stage 1 | Stage 2–4 | Stage 5+ / 1M registered |
+|---|---|---|---|
+| **App** | Expo (React Native), EAS Update for OTA | same | same |
+| **Catalog** | Static JSON on R2 | same | Postgres-backed API |
+| **Database** | Local Postgres only | **Supabase free tier** | Supabase Pro → managed Postgres |
+| **Auth** | none | Supabase Auth (Apple/Google) | same |
+| **Maps** | MapLibre + self-hosted Protomaps `.pmtiles` on R2 | same | same |
+| **Media** | R2 + Cloudflare CDN | same | same |
+| **Search** | on-device (Fuse.js or a hand-rolled index) | Postgres FTS | + pgvector semantic |
+| **Jobs** | your laptop, run by hand | pg-boss or GitHub Actions cron | same |
+| **AI** | Batch API from your laptop | same + Haiku for live moderation | same |
+| **Push** | — | Expo Push (free) | FCM/APNs direct |
+| **Analytics** | PostHog free (1M events/mo) | same | self-hosted |
+| **Errors** | Sentry free (5k/mo) | same | paid tier |
+
+Deliberately **not** in this plan until ~50k MAU: Redis, read replicas, Typesense, Centrifugo,
+Kubernetes, microservices, a staging environment. Postgres does all of it, and a solo dev
+maintaining infrastructure is a solo dev not building the product.
+
+### Why each choice survives to 1M
+
+- **Expo/RN** — one codebase, and EAS Update ships fixes without a 2-day App Store review.
+  For a part-time dev that is worth weeks a year.
+- **Postgres + PostGIS + pgvector** — geo, relational, full-text, and vector in one engine.
+  Replaces four services you'd otherwise pay for and operate.
+- **Supabase** — fastest path to auth + database with no ops. It *is* Postgres, so the exit is
+  a `pg_dump`. Its free tier pauses after **one week idle**, which is fine pre-beta and
+  irrelevant once real users are hitting it daily.
+- **Cloudflare R2** — $0 egress. This is what keeps media from ever becoming a bill.
+- **MapLibre + Protomaps** — the single most important cost decision. Mapbox and Google bill
+  mobile maps **per monthly active user**; a Montréal `.pmtiles` file on R2 is a flat ~$0.
+  Build it once with `planetiler` from an OSM extract.
+
+---
+
+## No-rework guarantees
+
+The things that are expensive to change later, decided now and never revisited:
+
+| Decision | Made in Stage 1 | Why it can't wait |
 |---|---|---|
-| 1 | < 50k | Single Supabase project. Nothing clever. Measure. |
-| 2 | 50–200k | Add read replicas; add Redis candidate cache; move media to R2; move tiles to Protomaps. |
-| 3 | 200k–500k | Split API from platform, own Postgres, partition `impressions`, add Typesense, self-host analytics. |
-| 4 | 500k–1M+ | Shard read traffic geographically (cities are naturally partitionable), regional CDN, consider a separate read model for the feed. |
+| **Three-entity schema** (venue / activity / outing) | Yes, tables exist empty | Re-modelling a live catalog touches everything |
+| **i18n as rows, not columns** (`activity_content` per locale) | Yes | `title_fr`/`title_en` columns become a rewrite at the third locale |
+| **Closed, versioned taxonomy** with stable slugs | Yes | Free-text tags are unrecoverable after ~1,000 listings |
+| **Tri-state accessibility** (`true`/`false`/`unknown`) | Yes | Retrofitting tri-state is a migration across every row |
+| **Tag provenance + confidence** | Yes | You cannot reconstruct who claimed what, after the fact |
+| **Money as integer cents + currency** | Yes | Floats and implied currency are a silent data-corruption bug |
+| **Timestamps as `timestamptz` + explicit venue timezone** | Yes | Naive local times break the first time DST hits an outing |
+| **UUID primary keys** | Yes | Sequential ints leak counts and break any future merge |
+| **No Google Places data in the catalog** | Yes | Their terms forbid caching it; building on it is unwindable |
+| **No per-MAU-priced dependency** | Yes | Growth would become the thing that bankrupts you |
 
-**Cities are the natural shard key.** Activity data is geographically local; a user in
-Montréal never queries Lisbon. If you ever need to split the database, split by city/region
-— not by user. Design the queries now so that's possible later (always carry a region
-predicate).
+**The only planned migration in the entire plan** is Supabase → self-managed Postgres,
+somewhere past 100k MAU. That is a `pg_dump`, a connection string, and an afternoon.
 
-## Non-functional requirements
+---
 
-- **Latency budget:** feed p95 < 400 ms end-to-end. Candidate gen < 40 ms (cached < 5 ms),
-  ranking < 10 ms, media via CDN.
-- **Offline:** saved activities, lists, and today's outing details must work with no network.
-  Cache the last feed. People lose signal exactly when they're going to the thing.
-- **Cold start:** app open to first meaningful paint < 1.5 s. Skeleton + cached feed while
-  the network resolves.
-- **Image discipline:** WebP/AVIF, 3 variants (thumb 400px, card 800px, full 1600px),
-  blurhash placeholders, aggressive lazy loading. Uncontrolled image sizes are how a feed
-  gets slow *and* expensive simultaneously.
-- **Accessibility (the app's own):** full VoiceOver/TalkBack, dynamic type, 4.5:1 contrast,
-  44pt targets. Non-negotiable for a product that advertises accessibility filtering — the
-  hypocrisy would be noticed, loudly and correctly.
-- **i18n:** ICU message format, FR/EN at launch, locale-aware dates/distances/currency,
-  RTL-ready layout even if no RTL locale ships yet.
-- **Observability:** OpenTelemetry traces; dashboards for feed latency, cache hit rate, queue
-  depth, LLM spend/day, moderation queue age. **Alert on LLM spend/day** — a bad loop can burn
-  a month's budget in an afternoon.
+## Non-functional targets (scaled to reality)
 
-## Security
-
-- Row-level security in Postgres if using Supabase's direct-from-client access. **Better: do
-  not let the client talk to the database at all** — go through the API. RLS policies for a
-  social graph with blocks and visibility rules get subtle fast, and a mistake is a data breach.
-- Secrets in a real manager, never in the app bundle. **Anything in the mobile binary is
-  public** — no third-party API key with billing exposure ships in the app.
-- Rate limits per user, per IP, per device on every write and on search.
-- Signed, short-TTL URLs for private media; public media through the CDN.
-- Certificate pinning for the API. Jailbreak/root detection is not worth it.
-- Annual pen test once there's a social graph and payments.
+- **Offline-first.** The catalog, saves, and lists work with no network. Non-negotiable — it's
+  a metro city and this is a planning app.
+- **Cold start < 1.5 s**, feed paint immediate from the bundled/cached catalog.
+- **Images:** WebP, 3 variants (400 / 800 / 1600 px), blurhash placeholders. Uncontrolled image
+  sizes make the app slow *and* expensive at the same time.
+- **i18n:** FR/EN from the first row, ICU message format, locale-aware dates and distances.
+- **App accessibility:** VoiceOver/TalkBack, dynamic type, 4.5:1 contrast, 44pt targets. This
+  is separate from the accessibility *filter* you demoted, and it stays.
+- **Security:** no key with billing exposure ships in the app bundle — anything in the binary
+  is public. Don't let the client talk to Postgres directly once auth exists; RLS policies for
+  a social graph get subtle, and a mistake is a data breach.
+- **Resumability:** small commits, a `NEXT.md` with the next three tasks, no long-lived
+  branches. You will lose three weeks to life, repeatedly.

@@ -1,5 +1,12 @@
 # 05 — Discovery, Search & Ranking
 
+> **v2 staging:** Stage 1 runs all of this **on-device** over a ~3 MB JSON catalog — no
+> Postgres, no Redis, no candidate cache, no embeddings. Filtering 2,000 rows in JS is
+> sub-millisecond. The two-stage retrieval, H3 cell caching and pgvector search below become
+> relevant past ~50k MAU; build them then, not now. **Ship in Stage 1 regardless:**
+> weather- and season-aware ranking (one forecast call per city per hour) and the vibe/context
+> shelves — they are nearly free and they are what makes the app feel alive.
+
 ## The performance constraint that shapes everything
 
 At 1M MAU the feed is the hot path: roughly **300M feed requests/month**. If each one runs

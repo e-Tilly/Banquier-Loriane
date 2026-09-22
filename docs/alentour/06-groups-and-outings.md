@@ -1,185 +1,142 @@
-# 06 — Groups & Outings
+# 06 — Groups & Outings *(v2: AI concierge, no paid humans)*
 
-The feature that turns a browsing app into a habit. Also the feature most likely to fail
-quietly, because **an outing with zero attendees is an advertisement for how empty your app
-is**, and users only give you one or two chances to show them one.
+Per your answer, groups are **a feature, not the point** — so this ships at Stage 5 (~month
+12), after the catalog works. And the bootstrapping problem gets solved by an **AI concierge
+plus venue-anchored outings** instead of paid ambassadors.
 
-## The central problem: nobody joins an empty room
+## The problem is unchanged
 
-Real dynamics, observed across every social-activity product:
-
-- Joining an event with 0 attendees costs social risk. Most people won't.
-- Joining an event with 3–5 attendees is easy. Almost everyone will.
-- So you need to get from 0 to 3 without anyone being the first person.
-- And hosting is even scarier: proposing a time and having nobody come is a public
-  humiliation, so people don't host, so there's nothing to join.
-
-Everything below is designed around that single chokepoint.
-
-## Three outing types
-
-| Type | Who creates it | Commitment | Purpose |
-|---|---|---|---|
-| **Rally** *(default for users)* | Any user | Vote on availability, not attendance | Solves the empty room |
-| **Fixed outing** | A user, or a friend group | Join a specific time | For when the time is already known |
-| **Business session** | A verified provider | Book a real class/session | Real supply, real reliability |
-
-### The Rally — the core mechanic
-
-Instead of "pick a time and hope", a user says:
-
-> "I want to do **bouldering at Allez Up**. I'm free **Thu 18:00, Sat 10:00, or Sun 14:00**.
-> Let's go if **at least 3 of us** are in. I'll decide by **Wednesday 20:00**."
-
-Others see a lightweight card and tap availability per option — `yes` / `maybe` / `no`.
-That's it. No commitment to a time that may not happen.
-
-At the deadline (or as soon as quorum is unambiguous):
-- **Quorum met** → the winning slot is chosen, the outing auto-confirms, everyone who said
-  `yes` to that slot is auto-joined and notified, a chat opens, calendar invites go out.
-- **Quorum not met** → auto-cancels with a gentle message and *one-tap re-rally next week*.
-  Nobody was rejected; the system was.
-
-Why this works:
-1. **Voting is cheap.** "I might be free Saturday" is not a commitment; "I will attend this
-   event" is. Conversion on the cheap action is several times higher.
-2. **It removes the host's fear of failure.** The rally didn't reach quorum — the host wasn't
-   rejected. This is the difference between people hosting and not hosting.
-3. **Better scheduling.** You get the slot most people can make, not the slot the host guessed.
-4. **A deadline creates urgency**, which is the only reliable driver of RSVP behaviour.
-
-Implementation notes:
-- Slot selection = maximize `2·yes + 1·maybe`, tie-break to the earliest slot.
-- Show a live "**2 more and this happens**" progress bar. Loss aversion works; use it honestly.
-- Push the host *and* voters at `deadline − 24h` if quorum is close ("one more yes and Saturday
-  is on").
-- Auto-nudge the "maybe" voters at quorum − 1.
-- Cap open rallies per user (3) to prevent spam.
-
-### Fixed outings
-
-Straight RSVP with capacity, waitlist (auto-promote on cancellation), guests (+1/+2 with the
-host's permission), approval-required joins for hosts who want them, and link-only visibility
-for friend groups. Support **co-hosts** — a second person materially reduces cancellations.
-
-### Business sessions
-
-A provider publishes real availability against a `recurring_program` activity. Same UI, but
-with an inventory count, a booking link or in-app hold, and a cancellation policy. These are
-the reliability backbone: a user's *first* outing should ideally be a business session,
-because it definitely happens.
+- Joining an outing with 0 attendees costs social risk. Most people won't.
+- Joining one with 3–5 is easy. Almost everyone will.
+- Hosting is scarier still: proposing a time and having nobody come is a public humiliation.
+- So: get from 0 to 3 without anyone having to be first, **and without a human organizer**,
+  because there isn't one.
 
 ---
 
-## Bootstrapping supply of outings (do not skip this)
+## The bright line on AI ambassadors
 
-The mechanic is necessary but not sufficient. For the first 3–6 months per city:
+You asked for AI ambassadors that handle invitations and guidance up to the moment people
+show up. That is buildable, and it replaces essentially all of an ambassador's *labour*.
 
-1. **Paid ambassadors.** 10–15 locals hosting 5–10 outings/week, paid ~$25–40 per hosted
-   outing. Budget $2–4k/month per city. Unglamorous, absolutely essential, and every
-   successful product in this category did it while claiming they didn't.
-2. **Business-seeded sessions.** Get 30 partner businesses to list real sessions. Instant
-   supply that reliably happens.
-3. **Ghost-free defaults.** Never show a "0 going" outing in the main feed. Rank outings with
-   ≥ 2 confirmed above ones with 0, and put fresh 0-attendee rallies in a distinct
-   "Help these happen" shelf where the framing is *contribution*, not *emptiness*.
-4. **Digest push, not per-outing push.** "3 outings near you this weekend" beats three
-   separate notifications, and doesn't burn notification permission.
-5. **Critical-mass gating.** Do not enable the outings tab in a city until there are ≥ 15
-   open outings/week. A user who opens an empty tab does not come back to it.
+**One hard constraint: the AI is the organizer, never a participant.**
+
+| The AI may | The AI may never |
+|---|---|
+| Notice latent demand and propose an outing | Appear in an attendee list |
+| Write and send invitations | Count toward quorum or capacity |
+| Collect votes, chase maybes, pick the slot | Have a human name, face, or fake profile |
+| Send logistics, weather, what-to-bring | Be described as "going" or "interested" |
+| Post icebreakers and a first-10-minutes card | Imply a human will be there who won't |
+| Nudge check-ins and run the post-outing loop | Be the accountable host of a physical gathering |
+
+**Why this is not negotiable:** if five people are shown as going and two are synthetic, you
+have manufactured social proof. Three people standing outside a bar waiting for two that
+don't exist ends the product by word of mouth, and in most consumer-protection regimes
+fabricated participation is a deceptive practice, not a growth tactic. Every outing's headcount
+must be humans who actually intend to show up.
+
+Presented honestly — *"Alentour noticed 6 people near you saved this. Want to go together?"* —
+the concierge is a **feature people like**, not a compromise. It is a smart app, not a fake friend.
 
 ---
 
-## Lifecycle & states
+## Two mechanisms replace the ambassador budget
+
+### A. Venue-anchored outings — the one that actually solves the empty room
+
+**Attach outings to things that already happen anyway.** A climbing gym's Tuesday beginner
+night. A bar's Wednesday trivia. A run club's Saturday 9am. A board-game café's open table.
+The museum's free first Sunday.
+
+The event happens whether or not anyone on Alentour shows up. So:
+
+- **There is no empty room.** Worst case, one user goes to a real thing that was running regardless.
+- **No host is needed.** The venue is the host.
+- **No trust burden on a stranger.** It's a public business with staff and a street address.
+- **It costs you nothing.** These are already in your catalog as `recurring_program`
+  activities — you are surfacing a schedule you already have.
+
+This should be **the default outing type at launch**, and probably 80% of outings in year one.
+A solo founder with no budget can absolutely populate "things happening near you this week"
+from opening hours and recurring programs. Start here, not with user-hosted meetups.
+
+### B. The Rally, run by the concierge
+
+For everything else, the v1 Rally mechanic, with the AI doing the organizing work:
 
 ```
- rally:  draft → voting → (quorum met) → confirmed → in_progress → completed
-                        ↘ (deadline, no quorum) → cancelled → [one-tap re-rally]
- fixed:  draft → open → (capacity) → full → confirmed → in_progress → completed
-                     ↘ cancelled_by_host / cancelled_low_turnout
+1. TRIGGER   Concierge spots latent demand: ≥4 users within ~3 km saved the same
+             activity in 14 days, or an activity matches several taste vectors.
+             (Or: any user taps "propose this" — same flow, human-initiated.)
+
+2. INVITE    Concierge drafts a personalized FR/EN invite, proposes 3 time windows
+             from the venue's real opening hours + typical free evenings.
+             Sends to those users only. Clearly from Alentour.
+
+3. VOTE      Each replies yes / maybe / no per window. Cheap, non-committal.
+             Concierge nudges maybes at quorum−1, and everyone at deadline−24h.
+
+4. RESOLVE   Quorum met  → slot locks (max 2·yes + 1·maybe), chat opens,
+                            calendar invites, logistics card sent.
+             Not met     → auto-cancels. "The system didn't find a time" —
+                            nobody was rejected. One-tap re-rally next week.
+
+5. PRE-SHOW  T−24h: what to bring, how to get there, cost, weather.
+             T−2h:  exact meeting point, who's coming (real humans, count only).
+             T−0:   check-in prompt, icebreaker card for the first 10 minutes.
+
+6. AFTER     "How was it?" → rating, re-rally prompt, optional mutual-opt-in
+             1:1 chat for people who'd do it again.
 ```
 
-Participant states: `interested → requested → joined → waitlisted → checked_in → attended`,
-with `no_show` and `cancelled_late` as terminal negatives.
+Steps 1–2 and 5–6 are the ambassador's job. All of it is automatable. **Step 3 still requires
+real humans to say yes** — that's the part you cannot and must not fake.
 
-**Timed jobs** (a queue, not cron-in-the-app): rally deadline evaluation, T−24h and T−2h
-reminders, check-in window open at T−30min, attendance finalization at T+3h, post-outing
-prompt at T+4h, chat purge at T+90d.
+**Cost:** a full rally lifecycle is ~10 Haiku 4.5 calls at ~1k tokens. Even at 10,000 rallies
+a month that is **under $50** — versus $2–4k/month for human ambassadors. This answer is both
+cheaper and more scalable than the thing it replaces.
 
-## Chat
+---
 
-- **Outing-scoped only.** No open DMs at launch — see [08](08-trust-safety-and-moderation.md).
-  A 1:1 channel between two people who have attended the same outing can come later, gated
-  by mutual opt-in.
-- Opens when the outing confirms; read-only 48h after it ends; purged at 90 days.
-- Host gets mute/remove; every message is reportable; automated moderation on send
-  ([08](08-trust-safety-and-moderation.md)).
-- **Do not build a realtime chat platform.** Postgres-backed messages + push + a lightweight
-  subscription is enough for outing chat. Per-connection realtime SaaS is a cost trap at 1M
-  users ([10](10-cost-model.md)).
+## Safety constraints that substitute for staffing
 
-## Attendance & reputation
+You cannot run 24/7 triage alone. So the product is constrained instead. All of these ship
+with outings, none are optional ([08](08-trust-safety-and-moderation.md)):
 
-- **Check-in** at the meeting point via a geofence (± 200 m, host confirms) or a host-shown
-  code. Voluntary, but it unlocks the verified-attendance review badge, which is the carrot.
-- **Reputation is behavioural, never a star rating of a person.** Public signals only:
-  - `Reliable` badge — attended ≥ 5 outings with < 10% no-show
-  - `Host` badge — hosted ≥ 3 completed outings
-  - `Verified` badges — phone / ID
-  - Member since; number of outings attended
-- No-shows: first is free (life happens), a pattern (≥ 30% over 5+ outings) reduces
-  `trust_level`, which restricts joining approval-required and high-demand outings. Tell the
-  user this is happening and let them recover. Never a public shame score.
-- **Cancellation asymmetry:** a host cancelling 2h before is far more costly than an attendee
-  doing so. Penalize accordingly, and require a reason.
+- **18+ only.** Matches your 18–30 audience and removes the entire minor-protection burden —
+  age gates, mandated reporting, adult-venue rules. Materially less work *and* less risk.
+- **Venue-anchored only in v1.** An outing must attach to a listed public venue. No
+  user-chosen meeting points, no residential addresses, ever.
+- **Phone verification** required to join any outing.
+- **Max 8 people.** Small enough to stay social, small enough to limit blast radius.
+- **Blocks enforced in the candidate query**, not filtered client-side.
+- **Fail-safe reporting:** a report **auto-pauses** the outing and notifies participants,
+  pending your review. Conservative by default, because you might be asleep.
+- **No DMs.** Outing-scoped chat only, auto-moderated, purged 90 days after.
+- **Explicit framing** in onboarding: Alentour does not vet anyone. Say it plainly.
 
-## Discovery of outings
-
-- **"Outings" tab:** upcoming, near, filtered by the same taxonomy plus `spots_left`,
-  `starts_within`, `group_size`, `icebreaker_score`, and audience fit.
-- **From an activity page:** "3 outings here this week" — the highest-converting entry point
-  in the app, because intent is already established. Put it above the fold.
-- **"People like you are going"** — collaborative signal, phrased carefully so it doesn't
-  read as surveillance.
-- **Friends' outings first**, always.
-
-## Group formation quality
-
-Randomly-assembled groups often fail socially. Cheap improvements:
-
-- **Prefer parallel activities for stranger groups.** Surface `icebreaker_score ≥ 1`
-  activities in the "meet people" shelves. Pottery, bouldering, and board games work; a
-  concert or a movie does not.
-- **Cap stranger outings at 4–8.** Below 4 it's fragile if one drops; above 8 it fragments
-  and nobody meets anyone.
-- **Show composition honestly before joining:** how many are attending, how many are new to
-  the app, the age range as a band (not individual ages), the language(s). No photos-first
-  browsing of attendees — that turns it into a dating app, which changes who shows up and
-  ruins it for everyone else.
-- **A structured first 10 minutes.** A host prompt card ("go around: name, what brought you
-  here, one thing you're bad at") measurably improves outcomes and costs nothing.
-- **Post-outing:** "would you do something with this group again?" — private, and a mutual
-  yes unlocks 1:1 chat. This is the safe path to a social graph.
+> **The honest risk statement.** Strangers meeting strangers, organized by one part-time
+> person with no moderation team, is the highest-risk thing in this plan. The mitigations
+> above are real, but they are constraints, not supervision. If you ever feel the outings
+> feature outrunning your ability to watch it, the correct move is to turn it off and keep
+> the dictionary running — the dictionary has no such exposure.
 
 ## Explicitly not a dating app
 
-State it in onboarding, in the ToS, and in moderation policy. Enforce it: no swipe UI, no
-attendee-photo browsing, no "singles" filters, aggressive action on unsolicited romantic
-DMs. The moment it drifts, women leave, and the product dies. This is a well-documented
-failure mode for every mixed activity/social app; the defense is product design, not policy
-text.
+18–30 makes this drift *more* likely, not less. Enforce in the product: no swipe UI, no
+browsing attendees by photo, no romantic-intent filters, in-app contact only until an outing
+confirms, and the concierge never frames an outing around who else is attractive. The moment
+it drifts, women leave and the product dies.
 
-## Metrics for this feature
+## Metrics
 
 | Metric | Target |
 |---|---|
-| Rally → quorum rate | ≥ 60% |
-| Median time from rally creation to quorum | < 36 h |
-| Confirmed outing → attendance rate | ≥ 80% |
+| Venue-anchored outings as % of all outings (year 1) | ~80% — this is healthy, not a failure |
+| Rally → quorum rate | ≥ 50% (lower than v1's 60%; no human chasing) |
+| Confirmed → attendance | ≥ 80% |
 | No-show rate | < 20% |
 | % of attendees who join a 2nd outing within 30 days | ≥ 40% |
-| % of outings hosted by non-ambassadors (organic host rate) | ≥ 70% by month 6 |
-| Reported safety incidents per 1,000 outings | < 1, and every one reviewed by a human |
-
-The organic host rate is the one that tells you whether this is a real product or a
-subsidized event calendar. Watch it weekly.
+| Concierge invite → vote rate | ≥ 25% |
+| Safety reports per 1,000 outings | < 1, every one reviewed by you personally |

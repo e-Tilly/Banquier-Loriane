@@ -1,5 +1,10 @@
 # 04 — Data Model
 
+> **v2:** this schema is unchanged and ships **in Stage 1**, authored in a local Postgres on
+> your laptop and exported to a static JSON catalog ([09](09-architecture.md)). The `outings`,
+> `reports` and `provider` tables sit empty until Stages 3–5 — empty tables are free, whereas
+> re-modelling a live catalog is not.
+
 Target: **PostgreSQL 16+ with PostGIS, pgvector, pg_trgm**. One database is the source of
 truth for everything until it demonstrably cannot be ([09](09-architecture.md)).
 

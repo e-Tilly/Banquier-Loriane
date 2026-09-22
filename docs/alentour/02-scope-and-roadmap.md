@@ -1,151 +1,167 @@
-# 02 — Scope & Roadmap
+# 02 — Scope & Roadmap *(v2: solo, part-time, unfunded)*
 
-## Sequencing principle
+## The constraint that determines everything
 
-**Supply, then demand, then liquidity, then revenue — in one neighbourhood at a time.**
+**One person, ~12 hours a week, no budget.**
 
-The failure mode for this category is launching a beautiful nationwide app with 40
-activities per city and no outings. A user who opens the app twice and sees nothing near
-them is gone forever, and re-acquiring them costs more than acquiring them did.
+The v1 plan was roughly 20 person-months of work. At 12 h/week that is about five years.
+AI-assisted coding is a real multiplier on *implementation* — maybe 2× — but zero on product
+decisions, catalog curation, moderation, and App Store review. So the answer is not to code
+faster. It is to **cut the product to its spine and add one organ at a time**, with each
+stage shippable and useful on its own.
 
-So: pick one neighbourhood. Get it to ~95% coverage of what actually exists there. Then
-widen. Density beats breadth by a wide margin in every local marketplace ever built.
-
----
-
-## Phase 0 — Validation (weeks 1–8)
-
-**Goal: find out if people will browse and filter at all, before building any of the hard parts.**
-
-- One city, 2–3 adjacent neighbourhoods. **300–500 activities, hand-curated.** Seed from
-  Overture + municipal open data, then a human walks the taxonomy over every one. Yes, by
-  hand. This is the most valuable 40 hours in the project — it is how you discover that
-  your taxonomy is wrong.
-- Ship: browse feed, map view, filters, activity detail, save. **No accounts beyond an
-  anonymous device ID. No groups. No business onboarding. No AI.**
-- Distribution: 200–500 people from local subreddits, Facebook groups, university housing,
-  newcomer associations.
-- **Kill/continue criteria:**
-  - ≥ 35% of installs apply at least one filter (proves the filter thesis)
-  - ≥ 25% return in week 2
-  - ≥ 15% save at least one activity
-  - Qualitative: 10 interviews where someone says "I did the thing I found."
-- If filters aren't used, the entire product thesis is wrong and you should know in week 8,
-  not month 14.
-
-**Team:** 1–2 engineers + you. Design can be a good template.
+Rule for every stage below: *if it can be deferred without causing rework, defer it.*
 
 ---
 
-## Phase 1 — Public MVP, one city (months 2–5)
+## Stage 1 — The catalog, with no backend *(months 1–3, ~140 h)*
 
-**Goal: a genuinely useful single-city activity dictionary.**
+**Ship a beautiful, offline-capable activity dictionary for two neighbourhoods. Nothing else.**
 
-Ships:
-- Accounts (Apple / Google / email OTP). Profiles, minimal.
-- **~2,000–3,000 activities in one city**, ≥ 60% with 3+ photos.
-- Full taxonomy and filter UI ([03](03-taxonomy.md)), including saved filter presets.
-- Feed + map + list, distance/duration/price/category/accessibility filters, `open now`.
-- **Weather- and season-aware ranking** (cheap, high impact — do it here, not later).
-- Activity detail: photos, tags, hours, price, how to get there, what to bring, accessibility.
-- Save, lists ("Rainy day", "With kids"), share-out (deep links + a decent OG preview).
-- Reviews and photo contributions from users.
-- **Assisted business claim:** owner emails/DMs you, you onboard them by hand. Do this
-  manually for the first 100 businesses. It is the best product research available and it
-  is how you learn exactly what the AI pipeline in Phase 3 must do.
-- FR/EN throughout.
-- Trust basics: report, block, moderation queue.
+The insight that makes this tractable: **300–2,000 activities is 2–5 MB of JSON.** You do not
+need a database, an API, a server, or auth to ship a filterable catalog. You need a file.
 
-Does **not** ship: groups, self-serve business onboarding, user-created activities,
-payments, personalization beyond stated interests.
+```
+  Local Postgres (your laptop)      ← the real schema from doc 04, authored once
+        │  export script
+        ▼
+  catalog.fr.json / catalog.en.json  (~3 MB, gzipped ~700 KB)
+  tiles: montreal.pmtiles            (~200 MB, built once from OSM)
+        │  upload
+        ▼
+  Cloudflare R2 + CDN  ──────►  Expo app: on-device filter, on-device map
+```
 
-**Success:** 10k installs in the launch city, 30% W4 retention, 5 saves/active user/month,
-250 claimed businesses.
+- **On-device filtering** is instant, works with no signal, and has no per-user cost.
+- **The app scales to ~100k users inside R2's free tier**, because it is a static file behind
+  a CDN. There is no request that can get slower.
+- **Updating the catalog = uploading a file.** No deploy, no migration, no downtime.
+- **Zero rework**, because the JSON is generated *from* the Postgres schema in
+  [04](04-data-model.md). When Stage 2 needs a live database, that database already exists —
+  you just put it online.
 
-**Team:** 2 mobile, 1–2 backend, 1 designer (0.5), 1 city ops/curator (this role is not optional).
+**In scope:** browse feed, vibe/context shelves, map, filters, activity detail, saves (device-
+local), lists, share links, FR/EN.
+**Out:** accounts, backend, UGC, business onboarding, outings, reviews, personalization, AI in
+the app.
 
----
+**Catalog:** 300–500 activities across **Plateau / Mile End / Villeray**, built by you with AI
+assistance (see [07](07-supply-onboarding-and-ai.md)). Budget ~30 h of curation; it is the
+most valuable work in the project and it is where you discover the taxonomy is wrong.
 
-## Phase 2 — Outings & Rallies (months 5–9)
+**Ship to:** TestFlight + Google Play internal testing, 30–80 people from local subreddits,
+Facebook groups, university housing, Discord servers.
 
-**Goal: turn discovery into attendance. This is the retention engine and the acquisition
-engine at once.**
+**Kill/continue gate:** ≥35% apply a filter · ≥25% return in week 2 · ≥15% save something ·
+10 interviews where someone says "I went and did it."
 
-Ships:
-- Outings: host, join, capacity, waitlist, guests, cancel, chat, reminders.
-- **Rallies** (propose time windows → vote → auto-confirm at quorum). See [06](06-groups-and-outings.md).
-- Friend invites, private outings, share-to-anywhere links.
-- Attendance check-in, no-show handling, post-outing prompts.
-- Full trust & safety stack: verification tiers, blocks that propagate, safety centre,
-  emergency contact share, in-app reporting with SLA. **Non-negotiable before this ships.**
-  See [08](08-trust-safety-and-moderation.md).
-- Seeded outings: paid community ambassadors host 5–10 outings/week in the launch city for
-  the first three months. Budget for this explicitly (~$2–4k/month). It is the only known
-  cure for the empty room.
-
-**Success:** 25% of MAU join ≥1 outing/month, ≥ 60% of Rallies reach quorum, no-show < 20%,
-zero serious safety incidents.
-
-**Team:** +1 backend, +0.5 community/trust ops.
+**Cost: ~$10/month** (Apple Developer, amortized) plus ~$130 of one-time AI seeding.
 
 ---
 
-## Phase 3 — Self-serve supply & AI enrichment (months 8–14, overlaps Phase 2)
+## Stage 2 — Accounts & sync *(months 4–5, ~90 h)*
 
-Ships:
-- **Business self-serve onboarding** via Meta / TikTok / Google Business OAuth + website URL
-  + camera roll, with the AI enrichment pipeline and the owner review screen. Target:
-  **under 5 minutes from "start" to "published", ≥ 90% of fields pre-filled.**
-  See [07](07-supply-onboarding-and-ai.md).
-- **User-created activities**, with dedup, moderation, and community editing.
-- Business dashboard: views, saves, outings at your venue, click-to-directions, respond to reviews.
-- Personalization (taste vectors, embeddings-based similarity, "more like this").
-- Natural-language search ("something chill and cheap for a rainy Sunday with my mom").
-- Monetization v1: Pro subscription, promoted placement (labeled). See [12](12-monetization-and-metrics.md).
+The first backend, and only because saved lists that die with a reinstall are infuriating.
 
-**Success:** 60% of new listings arrive self-serve; AI-drafted fields accepted unedited
-≥ 70% of the time; first $10k MRR.
+- Supabase free tier: auth (Apple / Google), saves, lists, sync.
+- The catalog **stays a static JSON file** — do not put it behind an API just because you now
+  have a database. Serving 2,000 rows per request to do work the phone already does for free
+  is a downgrade.
+- Analytics (PostHog free tier) so Stage 3 decisions are evidence-based.
+
+**Cost: still ~$10/month.**
 
 ---
 
-## Phase 4 — Expansion (months 14–24)
+## Stage 3 — Business claims, done by hand *(months 6–8, ~90 h)*
 
-- **A repeatable city playbook**: seed from open data → AI enrich → 200 hand-verified
-  anchor activities → recruit 10 ambassadors → 50 claimed businesses → launch. Target
-  4–6 weeks and < $15k per city. If a city takes more than that, the playbook isn't done
-  and you should not expand.
-- Transit isochrones ("reachable in 30 min by metro"), offline maps, Apple/Google Wallet
-  passes for outings, widgets, Live Activities.
-- Public web surface for SEO — this is a large organic acquisition channel and by then the
-  catalog is worth indexing.
-- Bookings/payments where operators want it; affiliate integrations.
-- Migration off the phase-1 managed platform if cost curves demand it ([09](09-architecture.md)).
+- A "claim this listing" form → an email to you → you verify and edit.
+- **Do the first 50 manually.** It is unglamorous and it is the best product research
+  available: you will learn exactly what the Stage 4 AI pipeline has to do, in a way no
+  amount of design thinking gets you.
+- A minimal owner-facing edit page (a web form, not an app). Owner dashboard can wait.
 
 ---
 
-## What is deliberately out of scope, and why
+## Stage 4 — AI enrichment & catalog scale-up *(months 8–11, ~110 h)*
 
-| Deferred | Reason |
-|---|---|
-| Web app at launch | Splits a small team's effort; the value is mobile-and-local. Read-only SEO surface in Phase 4. |
-| In-app payments / ticketing | Regulatory and support burden (refunds, chargebacks, tax). Link out until operators demand otherwise. |
-| Full messaging / DMs between users | Enormous safety surface. Outing-scoped chat only, until moderation is mature. See [08](08-trust-safety-and-moderation.md). |
-| Multi-day trips, itineraries | A different product. Lists cover 80% of it. |
-| Recurring "clubs" / persistent groups | Meetup's model. Revisit once outings work — it's a natural Phase 4 extension of repeat co-attendance. |
-| Tourist / international coverage | Dilutes density. See [01](01-product-and-market.md). |
-| Ratings *of people* | Toxic and gameable. Attendance reliability + badges only. |
+- The enrichment pipeline from [07](07-supply-onboarding-and-ai.md), run as a batch job on
+  your laptop against the Batch API — not as a live service.
+- Scale to **2,000–3,000 activities across central Montréal**.
+- Self-serve business onboarding via website-URL + photo upload. **Social OAuth import comes
+  later** — Meta app review is weeks of calendar time for a feature that serves a minority of
+  owners at this stage.
+- Catalog freshness loop: 90-day owner nudges, "report a problem", auto-demote stale listings.
 
-## Team shape
+**Cost: ~$60–100/month** once there are real users.
 
-| Phase | Eng | Design | Ops/community | Total headcount |
+---
+
+## Stage 5 — Outings, with the AI concierge *(months 12–18, ~160 h)*
+
+The group feature. Deferred this far on purpose: it needs a dense catalog, a real user base,
+and a safety stack, and it is the only part of the product that can hurt someone.
+
+Ships with **hard constraints that substitute for the staffing you don't have**
+([06](06-groups-and-outings.md), [08](08-trust-safety-and-moderation.md)):
+
+- **18+ only** — your audience anyway, and it deletes the entire minor-protection burden.
+- **Venue-anchored only** — an outing can only attach to a listed public venue. No
+  user-chosen meeting points at all in v1. One constraint, a whole class of risk gone.
+- **Phone verification required** to join. Max 8 people. Blocks enforced in the query.
+- **Fail-safe reporting:** a report auto-pauses the outing pending your review, rather than
+  waiting for a human to be awake.
+- **AI concierge** does the organizing; it is never an attendee.
+
+---
+
+## Stage 6 — UGC & revenue *(months 18–24)*
+
+User-created activities (after moderation exists, not before), Pro subscriptions, promoted
+placement. See [12](12-monetization-and-metrics.md).
+
+---
+
+## Timeline summary
+
+| Stage | Months | ~Hours | Ships | Monthly cost |
 |---|---|---|---|---|
-| 0 | 2 | 0.25 | 0.5 (you) | ~2.5 |
-| 1 | 3–4 | 0.5 | 1 | ~5.5 |
-| 2 | 4–5 | 1 | 1.5 (incl. trust & safety) | ~7.5 |
-| 3 | 5–6 | 1 | 2 | ~9 |
+| 1 — Catalog, no backend | 1–3 | 140 | Filterable dictionary, 2 neighbourhoods | ~$10 |
+| 2 — Accounts & sync | 4–5 | 90 | Saves that survive | ~$10 |
+| 3 — Manual claims | 6–8 | 90 | Real businesses on board | ~$15 |
+| 4 — AI enrichment | 8–11 | 110 | 3,000 activities, self-serve onboarding | ~$60–100 |
+| 5 — Outings + concierge | 12–18 | 160 | The group feature | ~$150 |
+| 6 — UGC & revenue | 18–24 | — | First money | ~$250 |
 
-**Build vs buy:** buy auth, push, crash reporting, analytics, ID verification, email/SMS,
-error tracking, and payments. Build the taxonomy, the ranking, the outing mechanics, the
-enrichment pipeline, and the moderation tooling — those are the product. Self-host only
-map tiles and (later) search, because those are precisely the two whose SaaS pricing
-scales with users rather than with usefulness (see [10](10-cost-model.md)).
+**~18 months to a product with groups.** That is the honest number for 12 h/week. Every stage
+before it is independently useful, which means you can stop at any point and still have
+shipped something real — and you get a kill signal at month 3, not month 30.
+
+---
+
+## What "side project" changes about the work itself
+
+- **Optimize for resumability, not velocity.** You will lose three weeks to life. Small
+  commits, a `NEXT.md` with the next three tasks, no half-finished refactors, tests on the
+  taxonomy export so a stale catalog can't ship silently.
+- **Never block on someone else.** Meta app review, Google Business Profile access, and
+  partner integrations all have multi-week queues you don't control. Nothing on the critical
+  path may depend on them — hence website-URL onboarding first.
+- **Buy every hour you can.** Managed auth, managed Postgres, off-the-shelf components. Your
+  scarce resource is hours, not dollars — and at this scale the dollars are ~$10/month anyway.
+- **The catalog is the product, and it is not code.** Budget real, recurring, non-coding time
+  for curation. A solo founder who only writes code will ship an empty app.
+
+## What is cut versus v1, and why
+
+| Cut | Reason |
+|---|---|
+| Paid ambassadors | Replaced by AI concierge + venue-anchored outings ([06](06-groups-and-outings.md)) |
+| City ops role, multi-city expansion | No team. One city is the whole plan for two years. |
+| Accessibility as headline feature | Per your answer. Schema kept, UI demoted ([03](03-taxonomy.md)) |
+| Community accessibility verification | Needs a user base you won't have for a year |
+| Typesense, Redis, read replicas, Centrifugo | Unnecessary below ~50k MAU. Postgres does all of it. |
+| Social OAuth import at launch | Weeks of app review on someone else's calendar |
+| Transit isochrones | Genuinely great, genuinely expensive. Stage 6+. |
+| Web surface | Per your answer |
+| 24/7 moderation triage | Impossible solo — replaced by constraint and fail-safe defaults |

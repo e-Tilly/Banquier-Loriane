@@ -1,104 +1,104 @@
 # Alentour — Product & Technical Plan
 
-> **Working codename.** "Alentour" (FR: *around, nearby*) is a placeholder. Replace it
-> everywhere before you buy a domain or file a trademark.
+> **v2 — rescoped for a solo, unfunded, part-time build.** See [CHANGELOG](CHANGELOG.md) for
+> what changed from v1 and why. "Alentour" (FR: *around, nearby*) remains a placeholder name.
 
-A mobile app that answers one question well: **"What can I actually go do near me?"** —
-and then a second one that no competitor answers well: **"...and who will come with me?"**
-
----
+A mobile app that answers one question well: **"What can I actually go do near me?"** — and
+later, a second one: **"...and who will come with me?"**
 
 ## The one-paragraph pitch
 
-A browsable, filterable dictionary of everything there is to do around you — from a
-kayak launch to a Tuesday pottery class to a free lookout at sunset — where every entry
-is tagged deeply enough that you can say "cheap, indoors, under two hours, easy, tonight,
-wheelchair accessible, reachable by metro" and get a real answer. Then, from any entry,
-you can propose a date and let strangers and friends join, so discovery turns into a
-plan that actually happens.
+A browsable, filterable dictionary of everything there is to do around you — from a kayak
+launch to a Tuesday pottery class to a free lookout at sunset — where every entry is tagged
+deeply enough that you can say "cheap, indoors, under two hours, tonight, reachable by metro"
+and get a real answer. Later, from any entry, an AI concierge can gather a few people who
+saved the same thing and turn it into an actual plan on an actual date.
 
 ## Documents
 
 | # | Document | What it settles |
 |---|---|---|
-| 01 | [Product & market](01-product-and-market.md) | Who it's for, what's differentiated, who we're up against, why now |
-| 02 | [Scope & roadmap](02-scope-and-roadmap.md) | What ships in what order, team, timeline |
+| — | [Changelog](CHANGELOG.md) | v1 → v2: your ten answers and their consequences |
+| 01 | [Product & market](01-product-and-market.md) | Audience (Montréal, 18–30), differentiation, competitors |
+| 02 | [Scope & roadmap](02-scope-and-roadmap.md) | **Six stages, ~12 h/week, 18 months. Start here.** |
 | 03 | [Taxonomy & tags](03-taxonomy.md) | The filter system — the heart of the product |
-| 04 | [Data model](04-data-model.md) | Entities, schema, the activity/venue/outing split |
-| 05 | [Discovery, search & ranking](05-discovery-and-ranking.md) | The feed, filters, personalization, cold start |
-| 06 | [Groups & outings](06-groups-and-outings.md) | The meet-people feature, incl. the quorum mechanic |
-| 07 | [Supply: onboarding & AI](07-supply-onboarding-and-ai.md) | Business signup from social profiles, AI enrichment, UGC |
-| 08 | [Trust, safety & moderation](08-trust-safety-and-moderation.md) | Strangers meeting strangers; content quality |
-| 09 | [Architecture & stack](09-architecture.md) | Concrete tech choices and why |
-| 10 | [Cost model to 1M users](10-cost-model.md) | Itemized $ at 10k / 100k / 1M MAU, and the traps |
-| 11 | [Legal & compliance](11-legal-and-compliance.md) | Privacy, Law 25/GDPR, liability, data licensing |
-| 12 | [Monetization & metrics](12-monetization-and-metrics.md) | Revenue lines, unit economics, north star |
-| 13 | [Risks & open questions](13-risks-and-open-questions.md) | What kills this, and what I need from you |
+| 04 | [Data model](04-data-model.md) | Entities, schema, the venue/activity/outing split |
+| 05 | [Discovery & ranking](05-discovery-and-ranking.md) | Feed, filters, weather-aware ranking, cold start |
+| 06 | [Groups & outings](06-groups-and-outings.md) | AI concierge, venue-anchored outings, the Rally |
+| 07 | [Supply & AI enrichment](07-supply-onboarding-and-ai.md) | Seeding the catalog, business onboarding, UGC |
+| 08 | [Trust & safety](08-trust-safety-and-moderation.md) | Constraint instead of staffing |
+| 09 | [Architecture](09-architecture.md) | **The free stack, and the no-rework guarantees** |
+| 10 | [Cost model](10-cost-model.md) | ~$10/mo to launch → ~$2,000/mo at 1M registered |
+| 11 | [Legal & privacy](11-legal-and-compliance.md) | Law 25, liability, data licensing |
+| 12 | [Monetization & metrics](12-monetization-and-metrics.md) | Side-project economics, five numbers to watch |
+| 13 | [Risks & next steps](13-risks-and-open-questions.md) | **What to do in your first two weeks** |
 
 ---
 
 ## Executive summary
 
-**The hard part is not the app. It is supply density in one neighbourhood, and the
-empty-room problem on group outings.** Everything in this plan is arranged around those
-two risks. The engineering is well-understood; the marketplace is not.
+**You are one person with ~12 hours a week and no budget.** That constraint, not the product
+vision, determines the plan. The v1 scope was ~20 person-months — five years at this pace. So
+the product is cut to its spine and grown one organ at a time, with something shippable at
+month 3 and a kill signal before you've spent a year.
 
-**Five decisions that carry the whole plan:**
+**Six decisions that carry the plan:**
 
-1. **Three entities, not one.** A *venue* (Parc Jean-Drapeau), an *activity* (kayaking
-   at Parc Jean-Drapeau), and an *outing* (kayaking there, Saturday 2pm, 6 spots, 3
-   taken). Most competitors collapse these and end up unable to answer either question.
-   See [04](04-data-model.md).
+1. **Stage 1 has no backend.** 300–2,000 activities is 2–5 MB of JSON. Ship it on Cloudflare
+   R2, filter on-device. No database, no API, no auth, no ops — and it serves ~100k users
+   inside a free tier. It is a deferral rather than a detour because that JSON is generated
+   from the same Postgres schema you'll eventually put online. ([09](09-architecture.md))
 
-2. **A closed, versioned tag vocabulary — never free text.** ~14 facets, every tag with
-   a stable slug, FR/EN labels, a provenance (`owner` / `ai` / `community` / `derived`)
-   and a confidence. The AI writes tags *into this enum* via structured outputs, so it
-   cannot invent "kinda sporty". See [03](03-taxonomy.md).
+2. **The cheap stack and the scalable stack are the same stack.** Postgres + R2 + MapLibre
+   cost $0 at zero users and ~$2,000/month at a million registered accounts. The only planned
+   migration in the whole plan is Supabase → self-managed Postgres, which is a `pg_dump`.
 
-3. **Seed the catalog from Overture Maps Places, not Google Places.** Google's terms
-   forbid caching most Place fields, so a catalog built on it is re-billed on every
-   render — economically fatal at 1M users. [Overture's places theme](https://docs.overturemaps.org/guides/places/)
-   is CDLA-Permissive 2.0 with no share-alike, ~61M POIs. Use Google only for
-   owner-facing address autocomplete during onboarding. See [07](07-supply-onboarding-and-ai.md)
-   and [10](10-cost-model.md).
+3. **Three entities, never collapsed: venue → activity → outing.** A community centre is one
+   venue and eight activities; an outdoor rink is one activity at forty venues. The tables
+   ship empty in Stage 1 because re-modelling a live catalog later touches everything.
+   ([04](04-data-model.md))
 
-4. **The "Rally" solves the empty room.** Nobody joins an outing with 0 attendees. So
-   the default group flow is not "pick a time and hope" — it is: propose 2–4 time
-   windows, set a minimum headcount and a decision deadline, and the outing
-   *auto-confirms or auto-cancels*. Voting on availability is a much lower-commitment
-   act than joining an empty event, and it converts. See [06](06-groups-and-outings.md).
+4. **A closed, versioned tag vocabulary — never free text.** Stable slugs, FR/EN labels,
+   provenance and confidence on every assignment. The AI writes *into* the enum via
+   constrained structured outputs, so it cannot invent a tag. ([03](03-taxonomy.md))
 
-5. **Own the cost curve from day one: R2 + MapLibre/Protomaps + Postgres.** Image
-   egress, map tiles, and per-document reads are what make apps like this cost
-   $60k/month at 1M users. With the stack in [09](09-architecture.md) the same load
-   lands around **$6–12k/month**. See [10](10-cost-model.md) for the arithmetic.
+5. **Seed from Overture Maps, not Google Places.** Google's terms forbid caching name,
+   address, hours, rating and photos — every render re-bills. Overture's places theme is
+   CDLA-Permissive 2.0 with no share-alike. ([07](07-supply-onboarding-and-ai.md))
 
-**Timeline:** ~8 weeks to a validation build in one neighbourhood, ~5 months to public
-MVP in one city, ~8 months to groups shipped, ~12 months to self-serve business
-onboarding and first revenue. See [02](02-scope-and-roadmap.md).
+6. **AI concierge organizes; it never attends.** It spots that six people nearby saved the
+   same climbing gym, writes the invites, chases the maybes, picks the slot, sends logistics
+   and weather. It is never listed as an attendee and never counts toward quorum — fabricated
+   social proof would end the product the first time three people waited for two who don't
+   exist. Paired with **venue-anchored outings** (attach to things that already happen), this
+   replaces the ambassador budget entirely, at under $50/month. ([06](06-groups-and-outings.md))
 
----
+**Timeline:** ~3 months to a shippable catalog in two neighbourhoods · ~11 months to a dense
+Montréal catalog with self-serve business onboarding · ~18 months to outings.
 
-## Stated assumptions
-
-I made these calls so the plan could be concrete. Each is cheap to change now and
-expensive to change later — correct me where I'm wrong (see [13](13-risks-and-open-questions.md)).
-
-| # | Assumption | Why it matters |
-|---|---|---|
-| A1 | **Launch market: Montréal / Québec**, expanding to the rest of Canada then EU | Drives bilingual-from-day-one, Law 25, Bill 96, and heavy winter seasonality |
-| A2 | **Bilingual FR/EN is a launch requirement, not a phase 2 i18n pass** | Quebec's Charter of the French Language; also forces the taxonomy to be i18n-clean from the first row |
-| A3 | **iOS + Android, no web app at launch** (a public read-only web surface comes later for SEO) | Justifies React Native/Expo over separate native codebases |
-| A4 | **Small team: 3–5 engineers**, not 15 | Rules out microservices, custom infra, and anything requiring a dedicated SRE |
-| A5 | **Consumer-free, business-paid.** Users never pay to browse or to join a free outing | Shapes monetization and the cost ceiling per user |
-| A6 | **Minimum age 16; hosting an outing requires 18+** | Drives verification, moderation, and alcohol/venue tag rules |
-| A7 | **"1M users" = 1M monthly actives**, ~30% DAU, seasonal peaks 2× in summer | The cost model is built on this; if it means 1M registered, every number drops ~3× |
+**Cost:** ~$10/month plus ~$230 one-time to reach a working beta. The only irreducible costs
+are Apple's $99/year and Google's $25.
 
 ---
 
-## How to read this if you have 20 minutes
+## Confirmed parameters
 
-[README](README.md) → [03 Taxonomy](03-taxonomy.md) → [06 Groups](06-groups-and-outings.md)
-→ [10 Cost model](10-cost-model.md) → [13 Open questions](13-risks-and-open-questions.md).
+| # | Parameter | Value | Consequence |
+|---|---|---|---|
+| P1 | Market | **Montréal**, FR/EN | Bilingual from the first row; Law 25; Bill 96; heavy winter seasonality |
+| P2 | Audience | **18–30** | Reshapes taxonomy emphasis; **minimum age 18 removes the entire minor-safety burden** |
+| P3 | Builder | **Solo, ~12 h/week** | Six stages; ruthless cut list; resumability over velocity |
+| P4 | Budget | **~$0 pre-launch, minimal at beta, no rework** | Free-tier stack that is also the scale stack |
+| P5 | Scale target | **1M registered** (≈220k MAU) | ~$2,000/month at that point |
+| P6 | Groups | **A feature, not the point** | Dictionary first; outings at Stage 5 |
+| P7 | Ambassadors | **AI, never human-simulating** | Concierge + venue-anchored outings |
+| P8 | Accessibility | **One filter among many** | UI demoted; tri-state schema and the AI prohibition kept |
+| P9 | Web | **Later** | Mobile-only through Stage 6 |
+| P10 | Brand | **Placeholder "Alentour"** | — |
 
-The rest is reference.
+---
+
+## If you have 15 minutes
+
+[02 Roadmap](02-scope-and-roadmap.md) → [09 Architecture](09-architecture.md) §Stage 1 →
+[13 Next steps](13-risks-and-open-questions.md). The rest is reference for when you get there.
