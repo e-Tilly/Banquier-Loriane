@@ -1,0 +1,184 @@
+# Alentour taxonomy — the closed vocabulary.
+#
+# RULES (see docs/alentour/03-taxonomy.md):
+#   - Slugs are stable forever. Labels may change; slugs may not.
+#   - Nothing is ever deleted — set `deprecated: true` so existing rows stay valid.
+#   - `version` bumps on every change; activities record the version they were tagged under.
+#   - Tri-state tags model "unknown" as absence. Absence NEVER means false.
+#   - ai_may_assert: false  =>  the enrichment pipeline may only *suggest*, never set true.
+version: 1
+locales: [fr-CA, en-CA]
+
+facets:
+
+  # ---------------------------------------------------------------- F1
+  - key: category
+    filterable: true
+    cardinality: one_primary_two_secondary
+    tags:
+      - { slug: category.outdoors,    fr: "Plein air et nature",   en: "Outdoors & nature" }
+      - { slug: category.water,       fr: "Sur l'eau",             en: "Water" }
+      - { slug: category.winter,      fr: "Hiver",                 en: "Winter" }
+      - { slug: category.sports,      fr: "Sport et mise en forme", en: "Sports & fitness" }
+      - { slug: category.thrill,      fr: "Sensations fortes",     en: "Thrill & adventure" }
+      - { slug: category.arts,        fr: "Arts et culture",       en: "Arts & culture" }
+      - { slug: category.learning,    fr: "Ateliers et cours",     en: "Learning & workshops" }
+      - { slug: category.games,       fr: "Jeux et compétition",   en: "Games & competition" }
+      - { slug: category.food,        fr: "Manger et boire",       en: "Food & drink" }
+      - { slug: category.nightlife,   fr: "Vie nocturne",          en: "Nightlife" }
+      - { slug: category.wellness,    fr: "Détente et bien-être",  en: "Wellness & relaxation" }
+      - { slug: category.family,      fr: "Famille et enfants",    en: "Family & kids", shelf: false }
+      - { slug: category.animals,     fr: "Animaux",               en: "Animals" }
+      - { slug: category.community,   fr: "Communauté et bénévolat", en: "Community & volunteering" }
+      - { slug: category.markets,     fr: "Marchés et friperies",  en: "Markets & shopping" }
+      - { slug: category.seasonal,    fr: "Festivals et saisonnier", en: "Festivals & seasonal" }
+
+  # ---------------------------------------------------------------- F2 (bands are derived from price_cents)
+  - key: price_band
+    filterable: true
+    derived: true
+    tags:
+      - { slug: price.free,   fr: "Gratuit",   en: "Free",      max_cents: 0 }
+      - { slug: price.low,    fr: "$",         en: "$",         max_cents: 1500 }
+      - { slug: price.mid,    fr: "$$",        en: "$$",        max_cents: 3000 }
+      - { slug: price.high,   fr: "$$$",       en: "$$$",       max_cents: 6000 }
+      - { slug: price.premium,fr: "$$$$",      en: "$$$$",      max_cents: null }
+    notes: >
+      Bands skew cheap for the 18–30 audience: the v1 thresholds ($40/$100) were tuned for a
+      broader market. Truth is always price_min_cents; bands are recomputed, never stored.
+
+  # ---------------------------------------------------------------- F5
+  - key: effort
+    filterable: true
+    scales:
+      - key: physical_demand
+        range: [0, 4]
+        anchors_per_category: true
+      - key: skill_required
+        range: [0, 4]
+        anchors_per_category: true
+      - key: risk_tier
+        range: [0, 3]
+        drives_behaviour: true
+        meanings:
+          0: "No meaningful risk"
+          1: "Minor injury possible — show a what-to-know block"
+          2: "Serious injury possible — waiver required to join; host must be verified"
+          3: "Requires certification/equipment/guide — cannot be community-hosted at all"
+
+  # ---------------------------------------------------------------- F6  (demoted in v2: 6 tags, was 14)
+  - key: accessibility
+    filterable: true
+    tristate: true
+    ai_may_assert: false          # enforced in src/taxonomy/check.ts and the enrichment pipeline
+    tags:
+      - { slug: a11y.step_free_entry,      fr: "Entrée sans marche",        en: "Step-free entry" }
+      - { slug: a11y.wheelchair_throughout,fr: "Accessible en fauteuil",    en: "Wheelchair accessible throughout" }
+      - { slug: a11y.accessible_washroom,  fr: "Toilette accessible",       en: "Accessible washroom" }
+      - { slug: a11y.seating_available,    fr: "Places assises",            en: "Seating available" }
+      - { slug: a11y.low_sensory,          fr: "Faible stimulation",        en: "Low sensory" }
+      - { slug: a11y.service_animals,      fr: "Animaux d'assistance admis", en: "Service animals welcome" }
+    reserved:                     # v1 slugs kept so they can return without a migration
+      [a11y.accessible_parking, a11y.hearing_loop, a11y.asl_lsq, a11y.audio_description,
+       a11y.braille_signage, a11y.elevator, a11y.good_lighting, a11y.staff_trained]
+
+  # ---------------------------------------------------------------- F7
+  - key: weather
+    filterable: true
+    tags:
+      - { slug: weather.indoor,   fr: "Intérieur",   en: "Indoor" }
+      - { slug: weather.covered,  fr: "Couvert",     en: "Covered" }
+      - { slug: weather.outdoor,  fr: "Extérieur",   en: "Outdoor" }
+      - { slug: weather.requires_snow, fr: "Nécessite de la neige", en: "Needs snow" }
+      - { slug: weather.requires_ice,  fr: "Nécessite de la glace", en: "Needs ice" }
+      - { slug: weather.bad_in_rain,   fr: "À éviter sous la pluie", en: "Bad in rain" }
+      - { slug: weather.requires_daylight, fr: "Nécessite la lumière du jour", en: "Needs daylight" }
+
+  # ---------------------------------------------------------------- F9
+  - key: group
+    filterable: true
+    tags:
+      - { slug: group.solo_friendly,  fr: "Bien seul",         en: "Good solo" }
+      - { slug: group.pairs,          fr: "À deux",            en: "Good for pairs" }
+      - { slug: group.small_group,    fr: "Petit groupe (3-6)", en: "Small group (3–6)" }
+      - { slug: group.large_group,    fr: "Grand groupe (7+)",  en: "Large group (7+)" }
+      - { slug: group.conversation_friendly, fr: "On peut jaser", en: "Easy to talk" }
+    scales:
+      - key: icebreaker_score
+        range: [0, 2]
+        notes: >
+          How well this works for strangers. 2 = parallel activity with natural talk and shared
+          incompetence (pottery, bouldering). 0 = no interaction possible (cinema, concert).
+          Powers the "meet people" shelves and the concierge's rally targeting.
+
+  # ---------------------------------------------------------------- F10
+  - key: audience
+    filterable: true
+    tags:
+      - { slug: audience.beginners_welcome, fr: "Débutants bienvenus", en: "Beginners welcome" }
+      - { slug: audience.students,          fr: "Rabais étudiant",     en: "Student discount" }
+      - { slug: audience.lgbtq_friendly,    fr: "LGBTQ+ friendly",     en: "LGBTQ+ friendly" }
+      - { slug: audience.newcomer_friendly, fr: "Nouveaux arrivants",  en: "Newcomer friendly" }
+      - { slug: audience.pets_welcome,      fr: "Animaux admis",       en: "Pets welcome" }
+      - { slug: audience.adults_only,       fr: "18 ans et plus",      en: "18+" }
+      - { slug: audience.kids,              fr: "Pour enfants",        en: "For kids", shelf: false }
+
+  # ---------------------------------------------------------------- F11
+  - key: booking
+    filterable: true
+    tags:
+      - { slug: booking.walk_in,             fr: "Sans réservation",     en: "Walk-in" }
+      - { slug: booking.reservation_recommended, fr: "Réservation suggérée", en: "Reservation recommended" }
+      - { slug: booking.reservation_required, fr: "Réservation requise",  en: "Reservation required" }
+      - { slug: booking.ticketed,            fr: "Billetterie",          en: "Ticketed" }
+      - { slug: booking.membership,          fr: "Abonnement requis",    en: "Membership required" }
+      - { slug: booking.waiver_required,     fr: "Décharge à signer",    en: "Waiver required" }
+
+  # ---------------------------------------------------------------- F12
+  - key: logistics
+    filterable: true
+    tags:
+      - { slug: logistics.transit_nearby,   fr: "Proche du métro/bus", en: "Near transit" }
+      - { slug: logistics.bike_parking,     fr: "Support à vélo",      en: "Bike parking" }
+      - { slug: logistics.free_parking,     fr: "Stationnement gratuit", en: "Free parking" }
+      - { slug: logistics.equipment_provided, fr: "Équipement fourni",  en: "Equipment provided" }
+      - { slug: logistics.rental_onsite,    fr: "Location sur place",  en: "Rental on site" }
+      - { slug: logistics.equipment_extra_cost, fr: "Location en sus",  en: "Rental costs extra" }
+      - { slug: logistics.food_onsite,      fr: "Nourriture sur place", en: "Food on site" }
+      - { slug: logistics.alcohol_served,   fr: "Alcool servi",        en: "Alcohol served" }
+      - { slug: logistics.cash_only,        fr: "Argent comptant",     en: "Cash only" }
+      - { slug: logistics.lockers,          fr: "Casiers",             en: "Lockers" }
+      - { slug: logistics.late_hours,       fr: "Ouvert tard",         en: "Open late" }
+
+  # ---------------------------------------------------------------- F13  (the discovery differentiator)
+  - key: vibe
+    filterable: true
+    max_per_activity: 3
+    tags:
+      - { slug: vibe.chill,             fr: "Relax",              en: "Chill" }
+      - { slug: vibe.adrenaline,        fr: "Adrénaline",         en: "Adrenaline" }
+      - { slug: vibe.romantic,          fr: "Romantique",         en: "Romantic" }
+      - { slug: vibe.social,            fr: "Pour rencontrer du monde", en: "Meet people" }
+      - { slug: vibe.learn_something,   fr: "Apprendre",          en: "Learn something" }
+      - { slug: vibe.get_moving,        fr: "Bouger",             en: "Get moving" }
+      - { slug: vibe.creative,          fr: "Créatif",            en: "Creative" }
+      - { slug: vibe.silly,             fr: "Niaiseux",           en: "Silly" }
+      - { slug: vibe.awe,               fr: "À couper le souffle", en: "Awe" }
+      - { slug: vibe.cozy,              fr: "Cocooning",          en: "Cozy" }
+      - { slug: vibe.rainy_day,         fr: "Jour de pluie",      en: "Rainy day" }
+      - { slug: vibe.hungover,          fr: "Lendemain de veille", en: "Hungover" }
+      - { slug: vibe.first_date,        fr: "Premier date",       en: "First date" }
+      - { slug: vibe.cheap_thrill,      fr: "Pas cher et le fun", en: "Cheap thrill" }
+      - { slug: vibe.impress_a_visitor, fr: "Impressionner un visiteur", en: "Impress a visitor" }
+      - { slug: vibe.solo_recharge,     fr: "Recharger seul",     en: "Solo recharge" }
+      - { slug: vibe.off_the_beaten_path, fr: "Hors des sentiers battus", en: "Off the beaten path" }
+
+# Home-screen shelves. Order matters — this is the first screen, and it is browse, not search.
+shelves:
+  - { key: free_tonight,   fr: "Gratuit ce soir",      en: "Free tonight",      filters: { tags: [price.free], open_now: true } }
+  - { key: rainy_day,      fr: "Jour de pluie",        en: "Rainy day",         filters: { tags: [vibe.rainy_day] }, when: { precipitation_prob_gt: 0.5 } }
+  - { key: cheap_date,     fr: "Date pas cher",        en: "Cheap date",        filters: { tags: [vibe.first_date], max_price_cents: 3000 } }
+  - { key: meet_people,    fr: "Rencontrer du monde",  en: "Meet people",       filters: { tags: [vibe.social], min_icebreaker: 1 } }
+  - { key: get_moving,     fr: "Se dégourdir",         en: "Get moving",        filters: { tags: [vibe.get_moving] } }
+  - { key: new_nearby,     fr: "Nouveau près de toi",  en: "New near you",      filters: { added_within_days: 30 } }
+  - { key: something_diff, fr: "Quelque chose de différent", en: "Something different", filters: { serendipity: true } }
