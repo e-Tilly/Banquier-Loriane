@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Alentour",
+    "slug": "alentour",
+    "version": "0.1.0",
+    "scheme": "alentour",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Alentour utilise ta position pour te montrer quoi faire proche de toi. Rien n'est partagé avec d'autres personnes."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.alentour.mobile"
+    },
+    "android": {
+      "package": "app.alentour.mobile"
+    },
+    "extra": {
+      "catalogUrl": "https://catalog.alentour.app/catalog.fr-CA.json"
+    }
+  }
+}

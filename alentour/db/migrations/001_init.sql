@@ -2,9 +2,14 @@
 -- Stage 1 runs this on a LOCAL Postgres only. It is the authoring source for the
 -- static catalog file; it is not deployed until Stage 2. See docs/alentour/09-architecture.md.
 --
--- Requires: postgis, pg_trgm. pgvector is optional until semantic search (Stage 4+).
+-- Requires only pg_trgm and pgcrypto — both ship with core Postgres.
+--
+-- Coordinates are plain doubles here, NOT PostGIS geography. Stage 1 filters on-device with
+-- haversine over a JSON catalog, so nothing queries spatially; requiring a PostGIS build just
+-- to author 500 rows on a laptop is a tax with no benefit. 003_postgis.sql adds the geography
+-- columns and GIST indexes when queries move server-side at Stage 2. The lat/lon columns stay,
+-- so that migration is additive.
 
-CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -12,7 +17,8 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE venues (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name             text NOT NULL,
-  geom             geography(Point, 4326) NOT NULL,
+  lat              double precision NOT NULL CHECK (lat BETWEEN -90 AND 90),
+  lon              double precision NOT NULL CHECK (lon BETWEEN -180 AND 180),
   address          jsonb,
   neighbourhood    text,
   timezone         text NOT NULL DEFAULT 'America/Toronto',
@@ -24,7 +30,6 @@ CREATE TABLE venues (
   created_at       timestamptz NOT NULL DEFAULT now(),
   updated_at       timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX venues_geom_gix ON venues USING GIST (geom);
 CREATE INDEX venues_name_trgm ON venues USING GIN (name gin_trgm_ops);
 
 -- ============================================================ providers (businesses)
@@ -117,10 +122,23 @@ CREATE TABLE activity_locations (
   activity_id uuid NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
   venue_id    uuid NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
   is_primary  boolean NOT NULL DEFAULT false,
-  geom        geography(Point, 4326) NOT NULL,
+  -- denormalized from venues: the hot query is "activities near me", not "venues near me"
+  lat         double precision NOT NULL,
+  lon         double precision NOT NULL,
   PRIMARY KEY (activity_id, venue_id)
 );
-CREATE INDEX activity_locations_geom_gix ON activity_locations USING GIST (geom);
+
+-- Keep the denormalized coordinates honest.
+CREATE OR REPLACE FUNCTION sync_activity_location_coords() RETURNS trigger AS $$
+BEGIN
+  SELECT v.lat, v.lon INTO NEW.lat, NEW.lon FROM venues v WHERE v.id = NEW.venue_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER activity_locations_coords
+  BEFORE INSERT OR UPDATE OF venue_id ON activity_locations
+  FOR EACH ROW EXECUTE FUNCTION sync_activity_location_coords();
 
 -- ============================================================ tags
 CREATE TABLE tags (
@@ -161,13 +179,20 @@ CREATE TRIGGER activity_tags_ai_guard
   BEFORE INSERT OR UPDATE ON activity_tags
   FOR EACH ROW EXECUTE FUNCTION enforce_ai_assertion_rules();
 
--- keep the denormalized array in sync with the normalized truth
+-- Keep the denormalized array in sync with the normalized truth.
+--
+-- Accessibility tags are deliberately EXCLUDED from tag_slugs. They are tri-state, and this
+-- array cannot express "unknown" — a slug is either present or not. Including them would
+-- create a second query path where a missing tag reads as "not accessible", silently
+-- collapsing unknown into false. Accessibility is queried only through activity_tags (and,
+-- in the exported catalog, the dedicated `a11y` object), so there is exactly one way to ask.
 CREATE OR REPLACE FUNCTION sync_tag_slugs() RETURNS trigger AS $$
 DECLARE target uuid := COALESCE(NEW.activity_id, OLD.activity_id);
 BEGIN
   UPDATE activities SET tag_slugs = COALESCE((
     SELECT array_agg(tag_slug ORDER BY tag_slug)
-    FROM activity_tags WHERE activity_id = target AND value IS TRUE
+    FROM activity_tags
+    WHERE activity_id = target AND value IS TRUE AND tag_slug NOT LIKE 'a11y.%'
   ), '{}') WHERE id = target;
   RETURN NULL;
 END;

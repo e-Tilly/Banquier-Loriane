@@ -1,0 +1,26 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    // The shared core in ../src uses explicit .ts specifiers so it can run under
+    // `node --experimental-strip-types`. Metro resolves them fine; TypeScript needs telling.
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "paths": {
+      "@core/*": ["../src/*"],
+      "@/*": ["./*"]
+    }
+  },
+  // The app may use the PURE catalog engine only. The Node-side tooling in ../src
+  // (export.ts, taxonomy/load.ts, the outreach agent) touches pg, fs and the filesystem —
+  // it must never end up in a mobile bundle, so it is not part of this program.
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "expo-env.d.ts",
+    "../src/catalog/types.ts",
+    "../src/catalog/filter.ts",
+    "../src/catalog/hours.ts",
+    "../src/catalog/shelves.ts"
+  ]
+}

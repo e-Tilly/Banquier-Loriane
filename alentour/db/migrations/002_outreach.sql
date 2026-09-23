@@ -115,10 +115,34 @@ CREATE TABLE outreach_messages (
 CREATE INDEX outreach_contact_ix ON outreach_messages (contact_id, sent_at DESC);
 CREATE INDEX outreach_queue_ix    ON outreach_messages (status, created_at);
 
--- Frequency caps: at most one message per contact per 30 days.
-CREATE UNIQUE INDEX outreach_one_per_30d
-  ON outreach_messages (contact_id, (date_trunc('day', sent_at)))
-  WHERE sent_at IS NOT NULL;
+-- Frequency cap: no two SENT messages to one contact within 30 days.
+-- An exclusion constraint states the rule directly. (A unique index on the day would only
+-- prevent two sends on the same calendar day, and date_trunc is STABLE, not IMMUTABLE, so it
+-- cannot be indexed at all.) consent.ts enforces the same rule before drafting; this is the
+-- backstop that makes it impossible to violate by any path.
+-- `timestamptz + interval` is STABLE (day arithmetic depends on the session timezone across
+-- DST), so the window end cannot be computed inside the constraint. Store it instead.
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+ALTER TABLE outreach_messages ADD COLUMN cooloff_until timestamptz;
+
+CREATE OR REPLACE FUNCTION set_outreach_cooloff() RETURNS trigger AS $$
+BEGIN
+  NEW.cooloff_until := CASE WHEN NEW.sent_at IS NULL THEN NULL
+                            ELSE NEW.sent_at + interval '30 days' END;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER outreach_cooloff
+  BEFORE INSERT OR UPDATE OF sent_at ON outreach_messages
+  FOR EACH ROW EXECUTE FUNCTION set_outreach_cooloff();
+
+ALTER TABLE outreach_messages ADD CONSTRAINT outreach_one_per_30d
+  EXCLUDE USING gist (
+    contact_id WITH =,
+    tstzrange(sent_at, cooloff_until) WITH &&
+  ) WHERE (sent_at IS NOT NULL);
 
 -- Immutable send log. Separate from outreach_messages so an edit to a draft can never
 -- rewrite history — this is the table you show a regulator.

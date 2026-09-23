@@ -9,10 +9,23 @@ consumes a static JSON catalog from R2. See [09 — Architecture](../docs/alento
 ```
 taxonomy/taxonomy.yaml     the closed vocabulary — 80 tags, 10 facets, versioned
 db/migrations/             the real schema, from doc 04
+db/seed/montreal.sql       10 real Plateau/Mile End activities, so the export runs on a clone
 src/taxonomy/              loader + validation; the enum the AI is constrained to
+src/catalog/               the engine: filter, rank, shelves, hours, export  ← shared with the app
 src/outreach/              the AI ambassador that writes to businesses (doc 14)
-test/                      28 tests, no network required
+app/                       the Expo app (Expo Router, FR/EN, offline-first)
+test/                      56 tests, no network or API key required
 ```
+
+## The shape of Stage 1
+
+```
+  local Postgres  ──catalog:export──►  catalog.fr-CA.json  ──►  R2 + CDN  ──►  Expo app
+  (never deployed)                     ~470 B per activity                    filters on-device
+```
+
+At 2,000 activities that file is about **940 KB gzipped**. There is no backend, no API and no
+database in production — which is why Stage 1 costs ~$10/month and works offline on the metro.
 
 ## Setup
 
@@ -70,7 +83,22 @@ step-free entrance strands a wheelchair user at a door.
 prose without a backing claim. Same principle as the consumer-side concierge: it organizes,
 it never fabricates participation.
 
+## The app
+
+```bash
+cd app && npm install
+npm start                     # then scan the QR with Expo Go
+```
+
+Screens: home (context shelves + ranked feed), browse (search, filter chips, filter sheet
+with live counts), activity detail, saved. FR/EN throughout, dark mode, offline-first.
+
+Verified by building and driving it in a browser: the catalog loads, shelves respond to
+weather, the filter sheet shows live per-option counts, and the accessibility block reports
+what is *unverified* rather than implying "no".
+
 ## Not built yet
 
-The Expo app, the catalog export script, and the enrichment pipeline. Next up is
-`src/catalog/export.ts` — Postgres → `catalog.json` — which is what makes Stage 1 shippable.
+The AI enrichment pipeline (doc 07), the map view, and outings (Stage 5). The catalog is
+seeded by hand until enrichment lands — which is the point: hand-curating the first 300
+listings is how you find out the taxonomy is wrong.
