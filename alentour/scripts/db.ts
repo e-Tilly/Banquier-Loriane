@@ -13,6 +13,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { syncTags } from "../src/taxonomy/sync.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, "..");
@@ -45,6 +46,9 @@ export async function migrate(pool: pg.Pool, log = console.log): Promise<string[
       client.release();
     }
   }
+  // The taxonomy YAML is the source of truth for tags; keep the table in step with it.
+  const n = await syncTags(pool);
+  if (applied.length) log(`  ✓ ${n} taxonomy tags synced`);
   return applied;
 }
 

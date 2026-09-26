@@ -20,7 +20,9 @@
     "dev:weather": "node --experimental-strip-types scripts/dev-weather.ts",
     "api:dev": "node --experimental-strip-types --watch src/api/server.ts",
     "api:start": "node --experimental-strip-types src/api/server.ts",
-    "admin": "node --experimental-strip-types scripts/admin.ts"
+    "admin": "node --experimental-strip-types scripts/admin.ts",
+    "enrich": "node --experimental-strip-types scripts/enrich.ts",
+    "freshness": "node --experimental-strip-types scripts/freshness.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

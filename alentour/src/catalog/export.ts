@@ -57,7 +57,12 @@ SELECT DISTINCT v.id, v.name, v.lat, v.lon, v.neighbourhood, v.timezone, v.addre
 `;
 
 /** Pure row -> catalog mapping, so it can be tested without a database. */
-export function toCatalogActivity(row: Record<string, any>): CatalogActivity {
+/** Listings nobody has confirmed in a year sink in ranking rather than vanish (docs/alentour/07). */
+const STALE_MS = 365 * 86_400_000;
+
+export function toCatalogActivity(row: Record<string, any>, now: Date = new Date()): CatalogActivity {
+  const verified = row.last_verified_at ? new Date(row.last_verified_at) : null;
+  const staleFactor = verified && now.getTime() - verified.getTime() > STALE_MS ? 0.5 : 1;
   const a: CatalogActivity = {
     id: row.id,
     slug: row.slug,
@@ -71,7 +76,7 @@ export function toCatalogActivity(row: Record<string, any>): CatalogActivity {
     risk: row.risk_tier ?? 0,
     months: row.months_open ?? 4095,
     tags: row.tag_slugs ?? [],
-    quality: round(row.quality_score ?? 0, 3),
+    quality: round((row.quality_score ?? 0) * staleFactor, 3),
   };
 
   // Everything below is omitted when absent — nulls would inflate the file for no benefit.
@@ -175,7 +180,7 @@ export async function buildCatalog(pool: pg.Pool, locale: string): Promise<Catal
   }
 
   const venues = venueRows.rows.map(toCatalogVenue);
-  const activities = activityRows.rows.map(toCatalogActivity);
+  const activities = activityRows.rows.map((r) => toCatalogActivity(r));
 
   return {
     format: CATALOG_FORMAT_VERSION,

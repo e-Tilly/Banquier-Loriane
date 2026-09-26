@@ -1,10 +1,11 @@
 import React from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable, Image, StyleSheet } from "react-native";
 import { Link } from "expo-router";
 import type { Scored } from "@core/catalog/filter.ts";
 import { usePalette, space, radius, typography, type Palette } from "../lib/theme.ts";
 import { formatPrice, formatDuration, formatDistance, effortLabel, type Lang } from "../lib/format.ts";
 import { translate } from "../lib/i18n.ts";
+import { mediaUrl } from "../lib/config.ts";
 
 interface Props {
   item: Scored;
@@ -33,7 +34,11 @@ export function ActivityCard({ item, lang, saved, onToggleSave, compact }: Props
         accessibilityLabel={`${a.title}. ${price}. ${formatDistance(item.distanceKm, lang)}`}
       >
         <View style={s.thumb}>
-          <Text style={s.thumbGlyph}>{categoryGlyph(a.cat)}</Text>
+          {a.img ? (
+            <Image source={{ uri: mediaUrl(a.img.key) }} style={s.thumbImg} accessibilityIgnoresInvertColors />
+          ) : (
+            <Text style={s.thumbGlyph}>{categoryGlyph(a.cat)}</Text>
+          )}
         </View>
 
         <View style={s.body}>
@@ -87,7 +92,7 @@ function Badge({ p, label, tone }: { p: Palette; label: string; tone: "accent" |
   );
 }
 
-/** Stand-in until real photography exists. */
+/** Stand-in for listings without a photo yet. */
 export function categoryGlyph(cat: string): string {
   const map: Record<string, string> = {
     "category.sports": "⛰", "category.outdoors": "🌲", "category.water": "🛶",
@@ -107,8 +112,9 @@ const styles = (p: Palette) => StyleSheet.create({
   compact: { padding: space.sm },
   thumb: {
     width: 64, height: 64, borderRadius: radius.md,
-    backgroundColor: p.surfaceAlt, alignItems: "center", justifyContent: "center",
+    backgroundColor: p.surfaceAlt, alignItems: "center", justifyContent: "center", overflow: "hidden",
   },
+  thumbImg: { width: 64, height: 64 },
   thumbGlyph: { fontSize: 26, color: p.ink3 },
   body: { flex: 1, gap: 3 },
   title: { ...typography.heading, color: p.ink },

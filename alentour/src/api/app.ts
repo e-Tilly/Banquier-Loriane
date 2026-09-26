@@ -16,6 +16,7 @@ import { libraryRoutes } from "./routes/library.ts";
 import { reportRoutes } from "./routes/reports.ts";
 import { claimRoutes, ownerRoutes } from "./routes/claims.ts";
 import { ownerPages } from "./pages/owner.ts";
+import { LocalStorage } from "../enrichment/storage.ts";
 
 export function createApp(d: Deps, opts: { trustProxy?: boolean } = {}) {
   const app = new Hono<AppEnv>();
@@ -26,7 +27,11 @@ export function createApp(d: Deps, opts: { trustProxy?: boolean } = {}) {
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     maxAge: 600,
   }));
-  app.use("*", bodyLimit({ maxSize: 512 * 1024, onError: (c) => c.json({ error: "payload_too_large" }, 413) }));
+  // JSON bodies are small; only the owner pages accept photo uploads (8 photos × 8 MB, with room).
+  const small = bodyLimit({ maxSize: 512 * 1024, onError: (c) => c.json({ error: "payload_too_large" }, 413) });
+  const uploads = bodyLimit({ maxSize: 70 * 1024 * 1024, onError: (c) => c.text("Upload too large.", 413) });
+  app.use("*", (c, next) =>
+    (c.req.path.startsWith("/owner/") && (c.req.header("content-type") ?? "").startsWith("multipart/form-data") ? uploads : small)(c, next));
   app.use("*", identify(d, opts.trustProxy ?? false));
 
   app.get("/health", async (c) => {
@@ -42,6 +47,18 @@ export function createApp(d: Deps, opts: { trustProxy?: boolean } = {}) {
   app.route("/v1/owner", ownerRoutes(d));
   // Server-rendered pages for business owners — a web form, not an app (docs/alentour/02).
   app.route("/owner", ownerPages(d));
+
+  // Development only: photos stored on disk are served from here. Production serves R2 directly.
+  const storage = d.enrich?.storage;
+  if (storage instanceof LocalStorage) {
+    app.get("/media/*", (c) => {
+      const key = c.req.path.slice("/media/".length);
+      const body = storage.read(key);
+      if (!body) return c.json({ error: "not_found" }, 404);
+      const type = key.endsWith(".png") ? "image/png" : key.endsWith(".webp") ? "image/webp" : "image/jpeg";
+      return c.body(new Uint8Array(body), 200, { "content-type": type, "cache-control": "public, max-age=86400" });
+    });
+  }
 
   app.notFound((c) => c.json({ error: "not_found" }, 404));
   app.onError((err, c) => {

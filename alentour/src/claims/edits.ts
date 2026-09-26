@@ -25,6 +25,8 @@ export const OwnerPatch = z.object({
   priceMaxCents: z.number().int().min(0).max(1_000_000).nullable().optional(),
   typicalDurationMinutes: z.number().int().min(5).max(24 * 60).nullable().optional(),
   openingHours: z.string().trim().max(300).nullable().optional(),
+  minAge: z.number().int().min(0).max(99).nullable().optional(),
+  weather: z.enum(["indoor", "covered", "outdoor", "either"]).nullable().optional(),
   /** Tri-state: true / false / null (= "I don't know", which removes any claim). */
   a11y: z.record(z.string(), z.boolean().nullable()).optional(),
   tagsAdd: z.array(z.string()).max(20).optional(),
@@ -83,7 +85,8 @@ export async function applyOwnerEdit(
   try {
     await client.query("BEGIN");
     const cur = (await client.query(
-      `SELECT is_free, price_min_cents, price_max_cents, typical_duration_minutes, opening_hours
+      `SELECT is_free, price_min_cents, price_max_cents, typical_duration_minutes, opening_hours,
+              min_age, weather_dependency
          FROM activities WHERE id = $1 FOR UPDATE`, [activityId])).rows[0];
     const patch: Record<string, unknown> = {};
     const previous: Record<string, unknown> = {};
@@ -97,6 +100,8 @@ export async function applyOwnerEdit(
     set("priceMaxCents", "price_max_cents", p.priceMaxCents);
     set("typicalDurationMinutes", "typical_duration_minutes", p.typicalDurationMinutes);
     set("openingHours", "opening_hours", p.openingHours);
+    set("minAge", "min_age", p.minAge);
+    set("weather", "weather_dependency", p.weather);
 
     await client.query(
       `UPDATE activities SET
@@ -105,14 +110,18 @@ export async function applyOwnerEdit(
          price_max_cents = CASE WHEN $5::boolean THEN $6 ELSE price_max_cents END,
          typical_duration_minutes = CASE WHEN $7::boolean THEN $8 ELSE typical_duration_minutes END,
          opening_hours = CASE WHEN $9::boolean THEN $10 ELSE opening_hours END,
-         last_verified_at = $11, updated_at = $11
+         last_verified_at = $11, updated_at = $11,
+         min_age = CASE WHEN $12::boolean THEN $13 ELSE min_age END,
+         weather_dependency = CASE WHEN $14::boolean THEN $15 ELSE weather_dependency END
        WHERE id = $1`,
       [activityId, p.isFree ?? null,
        p.priceMinCents !== undefined, p.priceMinCents ?? null,
        p.priceMaxCents !== undefined, p.priceMaxCents ?? null,
        p.typicalDurationMinutes !== undefined, p.typicalDurationMinutes ?? null,
        p.openingHours !== undefined, p.openingHours || null,
-       now]);
+       now,
+       p.minAge !== undefined, p.minAge ?? null,
+       p.weather !== undefined, p.weather ?? null]);
 
     for (const [locale, c] of Object.entries(p.content ?? {})) {
       if (!c) continue;
@@ -192,6 +201,7 @@ export async function ownerListings(pool: pg.Pool, userId: string) {
   const { rows } = await pool.query(
     `SELECT a.id, a.slug, a.status, a.is_free, a.price_min_cents, a.price_max_cents,
             a.typical_duration_minutes, a.opening_hours, a.last_verified_at,
+            a.min_age, a.weather_dependency, a.primary_category, a.kind,
             v.id AS venue_id, v.name AS venue_name,
             (SELECT jsonb_object_agg(c.locale, jsonb_build_object('title', c.title, 'summary', c.summary,
                      'description', c.description, 'whatToBring', c.what_to_bring))
@@ -199,7 +209,10 @@ export async function ownerListings(pool: pg.Pool, userId: string) {
             (SELECT jsonb_object_agg(t.tag_slug, t.value) FROM activity_tags t
               WHERE t.activity_id = a.id AND t.tag_slug LIKE 'a11y.%') AS a11y,
             (SELECT array_agg(t.tag_slug ORDER BY t.tag_slug) FROM activity_tags t
-              WHERE t.activity_id = a.id AND t.value AND t.tag_slug NOT LIKE 'a11y.%') AS tags
+              WHERE t.activity_id = a.id AND t.value AND t.tag_slug NOT LIKE 'a11y.%') AS tags,
+            (SELECT jsonb_agg(jsonb_build_object('id', m.id, 'key', m.storage_key, 'status', m.safety_status,
+                                                 'hero', m.is_hero) ORDER BY m.is_hero DESC, m.sort_order)
+               FROM media m WHERE m.owner_type = 'activity' AND m.owner_id = a.id) AS photos
        FROM activities a
        JOIN provider_members m ON m.provider_id = a.provider_id AND m.user_id = $1
        JOIN activity_locations l ON l.activity_id = a.id AND l.is_primary

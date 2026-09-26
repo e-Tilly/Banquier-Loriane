@@ -8,9 +8,17 @@
  *   npm run admin -- reject  <claim-id> "why"
  *   npm run admin -- reports                    open reports, most severe first
  *   npm run admin -- resolve <report-id> actioned|dismissed "note"
+ *   npm run admin -- pending                    listings waiting for review (seeded or self-serve)
+ *   npm run admin -- publish <venue-id>         publish a venue's pending listings (+ verify its business)
+ *   npm run admin -- hide <activity-id>         take one listing out of the catalog
+ *   npm run admin -- media                      photos waiting for a human (faces, no triage)
+ *   npm run admin -- media-ok <media-id> | media-no <media-id>
+ *   npm run admin -- jobs                       recent enrichment jobs, with token use
+ *   npm run admin -- stale                      published listings nobody confirmed in a year
  */
 import pg from "pg";
 import { approveClaim, rejectClaim } from "../src/claims/claims.ts";
+import { staleListings } from "../src/freshness/nudge.ts";
 
 const REVIEWER = `admin:${process.env.USER ?? "cli"}`;
 
@@ -25,7 +33,9 @@ export async function run(pool: pg.Pool, argv: string[], out: (s: string) => voi
         (SELECT count(*) FROM providers WHERE claim_status = 'verified')::int AS claimed,
         (SELECT count(*) FROM claims WHERE status = 'pending')::int AS pending_claims,
         (SELECT count(*) FROM reports WHERE status = 'open')::int AS open_reports,
-        (SELECT count(*) FROM reports WHERE status = 'open' AND severity >= 3)::int AS urgent_reports`);
+        (SELECT count(*) FROM reports WHERE status = 'open' AND severity >= 3)::int AS urgent_reports,
+        (SELECT count(*) FROM activities WHERE status = 'pending_review')::int AS pending_listings,
+        (SELECT count(*) FROM media WHERE safety_status = 'pending')::int AS pending_media`);
       for (const [k, v] of Object.entries(rows[0])) out(`${k.padEnd(16)} ${v}`);
       return 0;
     }
@@ -83,8 +93,86 @@ export async function run(pool: pg.Pool, argv: string[], out: (s: string) => voi
       out(r.rowCount ? "✓ resolved" : "not found or already resolved");
       return r.rowCount ? 0 : 1;
     }
+    case "pending": {
+      const { rows } = await pool.query(
+        `SELECT v.id AS venue_id, v.name, v.website, a.id, a.origin, a.primary_category, c.title,
+                p.display_name, p.claim_status, a.tag_slugs,
+                (SELECT string_agg(u.email, ', ') FROM provider_members m JOIN users u ON u.id = m.user_id
+                  WHERE m.provider_id = a.provider_id) AS owners
+           FROM activities a
+           JOIN activity_locations l ON l.activity_id = a.id AND l.is_primary
+           JOIN venues v ON v.id = l.venue_id
+           LEFT JOIN activity_content c ON c.activity_id = a.id AND c.locale = 'fr-CA'
+           LEFT JOIN providers p ON p.id = a.provider_id
+          WHERE a.status = 'pending_review' ORDER BY v.name, a.slug LIMIT 200`);
+      if (!rows.length) { out("Nothing pending."); return 0; }
+      let venue = "";
+      for (const r of rows) {
+        if (r.venue_id !== venue) {
+          venue = r.venue_id;
+          out(`\n${r.venue_id}  ${r.name}  ${r.website ?? ""}`);
+          if (r.owners) out(`  owner: ${r.owners} (business ${r.claim_status}; email not at the website's domain — check by phone)`);
+        }
+        out(`  [${r.origin}] ${r.title ?? r.id} — ${r.primary_category} — ${(r.tag_slugs ?? []).join(" ")}`);
+      }
+      return 0;
+    }
+    case "publish": {
+      if (!args[0]) { out("usage: publish <venue-id>"); return 2; }
+      const r = await pool.query(
+        `UPDATE activities SET status = 'published', updated_at = now()
+          WHERE status = 'pending_review' AND id IN (SELECT activity_id FROM activity_locations WHERE venue_id = $1)`, [args[0]]);
+      await pool.query(
+        `UPDATE providers SET claim_status = 'verified', claimed_at = COALESCE(claimed_at, now())
+          WHERE claim_status = 'pending' AND id = (SELECT provider_id FROM venues WHERE id = $1)`, [args[0]]);
+      out(`✓ ${r.rowCount} listing(s) published — they reach the app with the next catalog export`);
+      return 0;
+    }
+    case "hide": {
+      if (!args[0]) { out("usage: hide <activity-id>"); return 2; }
+      const r = await pool.query(`UPDATE activities SET status = 'hidden', updated_at = now() WHERE id = $1`, [args[0]]);
+      out(r.rowCount ? "✓ hidden" : "not found");
+      return r.rowCount ? 0 : 1;
+    }
+    case "media": {
+      const { rows } = await pool.query(
+        `SELECT m.id, m.owner_type, m.owner_id, m.storage_key, m.has_faces, m.triage->>'kind' AS kind, m.created_at
+           FROM media m WHERE m.safety_status = 'pending' ORDER BY m.created_at LIMIT 100`);
+      if (!rows.length) { out("No photos waiting."); return 0; }
+      const base = process.env.MEDIA_PUBLIC_URL ?? "http://localhost:8787/media";
+      for (const r of rows) {
+        out(`${r.id}  ${r.kind ?? "untriaged"}${r.has_faces ? " · faces" : ""}  ${base}/${r.storage_key}`);
+      }
+      return 0;
+    }
+    case "media-ok":
+    case "media-no": {
+      if (!args[0]) { out(`usage: ${cmd} <media-id>`); return 2; }
+      const r = await pool.query(`UPDATE media SET safety_status = $2 WHERE id = $1`, [args[0], cmd === "media-ok" ? "approved" : "rejected"]);
+      out(r.rowCount ? "✓ done" : "not found");
+      return r.rowCount ? 0 : 1;
+    }
+    case "jobs": {
+      const { rows } = await pool.query(
+        `SELECT id, origin, status, input->>'name' AS name, created_at, error,
+                (usage->>'input_tokens')::int AS tin, (usage->>'output_tokens')::int AS tout
+           FROM enrichment_jobs ORDER BY created_at DESC LIMIT 30`);
+      if (!rows.length) { out("No enrichment jobs."); return 0; }
+      for (const r of rows) {
+        out(`${r.id}  ${r.created_at.toISOString().slice(0, 16)}  ${r.origin.padEnd(10)} ${r.status.padEnd(10)} ${r.name}` +
+          `${r.tin ? `  (${r.tin} in / ${r.tout} out tokens)` : ""}${r.error ? `  ! ${r.error.slice(0, 80)}` : ""}`);
+      }
+      return 0;
+    }
+    case "stale": {
+      const rows = await staleListings(pool);
+      if (!rows.length) { out("Nothing stale."); return 0; }
+      for (const r of rows) out(`${r.id}  ${r.last_verified_at ? r.last_verified_at.toISOString().slice(0, 10) : "never"}  [${r.origin}] ${r.title}${r.provider ? ` — ${r.provider}` : ""}`);
+      return 0;
+    }
     default:
-      out("commands: stats | claims | approve <id> | reject <id> \"why\" | reports | resolve <id> actioned|dismissed \"note\"");
+      out("commands: stats | claims | approve <id> | reject <id> \"why\" | reports | resolve <id> actioned|dismissed \"note\"" +
+        " | pending | publish <venue-id> | hide <activity-id> | media | media-ok <id> | media-no <id> | jobs | stale");
       return cmd ? 2 : 0;
   }
 }

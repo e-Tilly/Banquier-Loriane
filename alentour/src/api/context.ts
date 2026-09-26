@@ -2,6 +2,7 @@ import type pg from "pg";
 import type { JWTVerifyGetKey } from "jose";
 import type { ApiConfig } from "./config.ts";
 import type { Mailer } from "./mailer.ts";
+import type { EnrichDeps } from "../enrichment/pipeline.ts";
 
 /** Everything the API needs from the outside world, injected so tests can control it. */
 export interface Deps {
@@ -11,6 +12,8 @@ export interface Deps {
   now?: () => Date;
   /** Key sets for verifying Apple/Google ID tokens. Defaults to the providers' live JWKS. */
   jwks?: { apple?: JWTVerifyGetKey; google?: JWTVerifyGetKey };
+  /** Stage 4: the enrichment pipeline, photo storage and geocoding. Absent: onboarding is off. */
+  enrich?: EnrichDeps;
 }
 
 export interface SessionUser {

@@ -17,8 +17,14 @@ import type { AppEnv, Deps, SessionUser } from "../context.ts";
 import { sessionUser, startEmailSignIn, verifyEmailCode, revokeSession } from "../auth.ts";
 import { hmac, safeEqual } from "../crypto.ts";
 import { startClaim, verifyClaimCode } from "../../claims/claims.ts";
-import { applyOwnerEdit, confirmStillAccurate, ownerListings, type OwnerPatch } from "../../claims/edits.ts";
-import { loadTaxonomy } from "../../taxonomy/load.ts";
+import { applyOwnerEdit, canEdit, confirmStillAccurate, ownerListings, type OwnerPatch } from "../../claims/edits.ts";
+import { facet, loadTaxonomy } from "../../taxonomy/load.ts";
+import { UUID_RE } from "../http.ts";
+import { checkUrl } from "../../enrichment/net.ts";
+import { findDuplicateVenues, type DuplicateVenue } from "../../enrichment/geo.ts";
+import { createJob, jobAllowance } from "../../enrichment/pipeline.ts";
+import { deletePhoto, publishOnboarding, storePhotos, type Review } from "../../enrichment/listing.ts";
+import type { Draft, DraftActivity } from "../../enrichment/types.ts";
 
 const COOKIE = "alentour_owner";
 type L = "fr" | "en";
@@ -76,14 +82,96 @@ const T = {
   status_verified: { fr: "confirmée", en: "confirmed" },
   status_rejected: { fr: "refusée", en: "declined" },
   status_withdrawn: { fr: "retirée", en: "withdrawn" },
+  practical: { fr: "Prix, durée, heures", en: "Price, duration, hours" },
+  minAge: { fr: "Âge minimum", en: "Minimum age" },
+  weatherF: { fr: "Intérieur ou extérieur", en: "Indoor or outdoor" },
+  w_indoor: { fr: "Intérieur", en: "Indoor" },
+  w_covered: { fr: "Couvert", en: "Covered" },
+  w_outdoor: { fr: "Extérieur", en: "Outdoor" },
+  w_either: { fr: "Les deux", en: "Either" },
+  confHigh: { fr: "confiance élevée", en: "high confidence" },
+  confMedium: { fr: "à vérifier", en: "please check" },
+  fromSite: { fr: "Tiré de votre site :", en: "From your website:" },
+  siteSays: { fr: "Votre site dit :", en: "Your website says:" },
+  pleaseConfirm: { fr: "confirmez vous-même", en: "please confirm yourself" },
+  photos: { fr: "Photos", en: "Photos" },
+  noPhotos: { fr: "Aucune photo pour l'instant.", en: "No photos yet." },
+  hero: { fr: "principale", en: "main" },
+  ph_approved: { fr: "en ligne", en: "live" },
+  ph_pending: { fr: "en vérification", en: "being reviewed" },
+  ph_rejected: { fr: "refusée", en: "declined" },
+  remove: { fr: "Retirer", en: "Remove" },
+  upload: { fr: "Ajouter les photos", en: "Add photos" },
+  licence: { fr: "J'accorde à Alentour une licence non exclusive d'afficher ces photos et je confirme avoir le droit de l'accorder.", en: "I grant Alentour a non-exclusive licence to display these photos and confirm I have the right to grant it." },
+  licenceRequired: { fr: "Cochez la licence pour ajouter des photos.", en: "Tick the licence box to add photos." },
+  photoRules: { fr: "JPEG, PNG ou WebP, 8 Mo max, 8 photos max. On retire la localisation GPS des photos. Les photos où l'on voit des gens sont vérifiées avant d'être publiées.", en: "JPEG, PNG or WebP, 8 MB max, 8 photos max. We remove GPS location from photos. Photos showing people are checked before they go live." },
+  err_too_large: { fr: "fichier trop lourd (8 Mo max)", en: "file too large (8 MB max)" },
+  err_unsupported_format: { fr: "format non pris en charge (JPEG, PNG, WebP)", en: "unsupported format (JPEG, PNG, WebP)" },
+  err_too_many: { fr: "8 photos maximum", en: "8 photos maximum" },
+  awaitingReview: { fr: "en attente de vérification", en: "awaiting review" },
+  addBusiness: { fr: "Ajouter mon entreprise", en: "Add my business" },
+  newTitle: { fr: "Ajouter votre entreprise", en: "Add your business" },
+  newIntro: { fr: "Donnez-nous votre site web : on prépare votre fiche, vous la vérifiez. Environ cinq minutes.", en: "Give us your website: we draft your listing, you check it. About five minutes." },
+  nameF: { fr: "Nom de l'entreprise", en: "Business name" },
+  websiteF: { fr: "Site web (facultatif, mais ça aide beaucoup)", en: "Website (optional, but it helps a lot)" },
+  addressF: { fr: "Adresse à Montréal", en: "Address in Montréal" },
+  pitchF: { fr: "Ce que vous faites, en une phrase", en: "What you do, in one sentence" },
+  draftIt: { fr: "Préparer ma fiche", en: "Draft my listing" },
+  errName: { fr: "Le nom est requis.", en: "The name is required." },
+  errAddress: { fr: "L'adresse est requise.", en: "The address is required." },
+  errWebsite: { fr: "Ce site web n'est pas une adresse valide.", en: "That website is not a valid address." },
+  errNotFound: { fr: "On ne trouve pas cette adresse à Montréal. Vérifiez-la (numéro, rue).", en: "We can't find that address in Montréal. Check it (number, street)." },
+  errLimit: { fr: "Limite quotidienne atteinte. Réessayez demain.", en: "Daily limit reached. Try again tomorrow." },
+  dupTitle: { fr: "Vous êtes peut-être déjà sur Alentour", en: "You might already be on Alentour" },
+  dupIntro: { fr: "Ces fiches ressemblent à votre entreprise. Si c'est vous, réclamez-la plutôt que d'en créer une deuxième.", en: "These listings look like your business. If one is yours, claim it instead of creating a second one." },
+  claimThis: { fr: "C'est moi — réclamer", en: "That's me — claim it" },
+  notMe: { fr: "Aucune de celles-ci : continuer", en: "None of these: continue" },
+  working: { fr: "On prépare votre fiche…", en: "Drafting your listing…" },
+  step_fetching: { fr: "Lecture de votre site web", en: "Reading your website" },
+  step_extracting: { fr: "Repérage des faits (prix, heures, activités)", en: "Finding the facts (prices, hours, activities)" },
+  step_writing: { fr: "Rédaction en français et en anglais", en: "Writing in French and English" },
+  failed: { fr: "Quelque chose a échoué. Vous pouvez remplir la fiche vous-même.", en: "Something failed. You can fill in the listing yourself." },
+  reviewTitle: { fr: "Vérifiez votre fiche", en: "Check your listing" },
+  reviewIntro: { fr: "On a rédigé ceci à partir de votre site. Tout est modifiable. Les champs marqués ✦ viennent de votre site — vérifiez-les. Un champ vide vaut mieux qu'un champ faux.", en: "We drafted this from your website. Everything is editable. Fields marked ✦ come from your site — check them. A blank field beats a wrong one." },
+  note_no_ai: { fr: "La rédaction automatique n'est pas disponible : remplissez les champs vous-même.", en: "Automatic drafting isn't available: fill in the fields yourself." },
+  note_ai_failed: { fr: "La rédaction automatique a échoué : remplissez les champs vous-même.", en: "Automatic drafting failed: fill in the fields yourself." },
+  note_website_unreadable: { fr: "On n'a pas pu lire votre site web; la fiche est plus vide que d'habitude.", en: "We couldn't read your website, so the draft is emptier than usual." },
+  note_website_robots: { fr: "Votre site demande aux robots de ne pas le lire; on a respecté ça.", en: "Your website asks robots not to read it; we respected that." },
+  note_website_invalid: { fr: "L'adresse du site web n'est pas utilisable.", en: "The website address can't be used." },
+  include: { fr: "Inclure cette activité", en: "Include this activity" },
+  kindF: { fr: "Type", en: "Type" },
+  k_place: { fr: "Lieu (on y va quand c'est ouvert)", en: "Place (go when it's open)" },
+  k_recurring_program: { fr: "Cours ou soirée récurrente", en: "Recurring class or night" },
+  k_scheduled_event: { fr: "Événement à date fixe", en: "One-off event" },
+  k_self_guided: { fr: "Autonome (parcours, sentier)", en: "Self-guided (trail, route)" },
+  k_seasonal: { fr: "Saisonnier", en: "Seasonal" },
+  categoryF: { fr: "Catégorie", en: "Category" },
+  chooseCategory: { fr: "— choisir —", en: "— choose —" },
+  phoneF: { fr: "Téléphone", en: "Phone" },
+  confirmPrice: { fr: "J'ai vérifié les prix (ou je les ai laissés vides).", en: "I checked the prices (or left them blank)." },
+  confirmA11y: { fr: "J'ai répondu aux questions d'accessibilité seulement avec ce que je sais.", en: "I answered the accessibility questions only with what I know." },
+  consent: { fr: "Alentour peut m'écrire au sujet de ma fiche et de l'intérêt qu'elle suscite (désabonnement en un clic).", en: "Alentour may email me about my listing and the interest it gets (one-click unsubscribe)." },
+  publish: { fr: "Publier", en: "Publish" },
+  discard: { fr: "Abandonner ce brouillon", en: "Discard this draft" },
+  drafts: { fr: "Brouillons", en: "Drafts" },
+  continueDraft: { fr: "Continuer", en: "Continue" },
+  publishedNow: { fr: "Publié ! Votre fiche sera dans l'app à la prochaine mise à jour du catalogue.", en: "Published! Your listing will be in the app with the next catalog update." },
+  publishedPending: { fr: "Merci ! On vérifie que l'entreprise est bien à vous, puis on publie. Pour une vérification immédiate, connectez-vous avec une adresse au domaine de votre site.", en: "Thanks! We'll check the business is yours, then publish. To verify instantly, sign in with an address at your website's domain." },
+  location: { fr: "Emplacement", en: "Location" },
 } as const;
 
 const EDITABLE_FACETS = ["vibe", "audience", "logistics", "group", "booking", "weather"];
+const FACET_LABELS: Record<string, { fr: string; en: string }> = {
+  vibe: { fr: "Ambiance", en: "Vibe" }, audience: { fr: "Pour qui", en: "Who it's for" },
+  logistics: { fr: "Sur place", en: "On site" }, group: { fr: "En groupe", en: "Groups" },
+  booking: { fr: "Réservation", en: "Booking" }, weather: { fr: "Météo", en: "Weather" },
+};
 
 export function ownerPages(d: Deps) {
   const app = new Hono<AppEnv>();
   const now = () => (d.now ? d.now() : new Date());
   const csrfFor = (u: SessionUser) => hmac(d.config.secret, `csrf:${u.sessionId}`);
+  const mediaUrl = (key: string) => (d.enrich ? d.enrich.storage.url(key) : key);
 
   const lang = (c: Context<AppEnv>): L => {
     const q = c.req.query("lang");
@@ -125,21 +213,31 @@ export function ownerPages(d: Deps) {
           <button>${tr("sendCode")}</button>
         </form>`));
     }
-    const [listings, claims] = await Promise.all([
+    const [listings, claims, drafts] = await Promise.all([
       ownerListings(d.pool, u.id),
       d.pool.query(`SELECT c.status, c.created_at, v.name FROM claims c JOIN venues v ON v.id = c.venue_id
                      WHERE c.claimant_id = $1 ORDER BY c.created_at DESC`, [u.id]),
+      d.pool.query(`SELECT id, input->>'name' AS name, status FROM enrichment_jobs
+                     WHERE requested_by = $1 AND origin = 'onboarding' AND status NOT IN ('published', 'discarded')
+                     ORDER BY created_at DESC`, [u.id]),
     ]);
     const title = (x: any) => x.content?.[l === "fr" ? "fr-CA" : "en-CA"]?.title ?? x.content?.["fr-CA"]?.title ?? x.slug;
+    const published = c.req.query("published");
     return c.html(page(l, tr("listings"), html`
       <p class="muted">${u.email}</p>
+      ${published === "published" ? html`<p class="card ok">${tr("publishedNow")}</p>` : ""}
+      ${published === "pending_review" ? html`<p class="card ok">${tr("publishedPending")}</p>` : ""}
+      ${drafts.rows.length ? html`<section class="card"><h2>${tr("drafts")}</h2><ul class="list">
+        ${drafts.rows.map((j: any) => html`<li>${j.name} — <a href="/owner/drafts/${j.id}">${tr("continueDraft")}</a></li>`)}
+      </ul></section>` : ""}
       <section class="card">
         <h2>${tr("listings")}</h2>
         ${listings.length ? html`<ul class="list">${listings.map((x: any) => html`
           <li><a href="/owner/activities/${x.id}">${title(x)}</a>
+            ${x.status === "pending_review" ? html` <span class="badge">${tr("awaitingReview")}</span>` : ""}
             <span class="muted"> · ${x.venue_name} · ${tr("lastVerified")} ${x.last_verified_at ? fmtDate(x.last_verified_at, l) : tr("never")}</span></li>`)}
         </ul>` : html`<p class="muted">${tr("noListings")}</p>`}
-        <p><a class="button" href="/owner/claim">${tr("claim")}</a></p>
+        <p class="inline"><a class="button" href="/owner/new">${tr("addBusiness")}</a> <a class="button secondary" href="/owner/claim">${tr("claim")}</a></p>
       </section>
       ${claims.rows.length ? html`<section class="card"><h2>${tr("claims")}</h2><ul class="list">
         ${claims.rows.map((c: any) => html`<li>${c.name} — ${tr(`status_${c.status}` as keyof typeof T)}</li>`)}
@@ -250,7 +348,7 @@ export function ownerPages(d: Deps) {
     if (!u) return c.redirect("/owner");
     const x = (await ownerListings(d.pool, u.id)).find((r: any) => r.id === c.req.param("id"));
     if (!x) return c.text("Not found", 404);
-    return c.html(editPage(l, x, csrfFor(u), c.req.query("saved") === "1" ? "saved" : null, []));
+    return c.html(editPage(l, x, csrfFor(u), c.req.query("saved") === "1" ? "saved" : null, [], mediaUrl));
   });
 
   app.post("/activities/:id", async (c) => {
@@ -260,9 +358,10 @@ export function ownerPages(d: Deps) {
     const id = c.req.param("id");
     const current = (await ownerListings(d.pool, u.id)).find((r: any) => r.id === id);
     if (!current) return c.text("Not found", 404);
-    const b = await c.req.parseBody();
+    // all: true — the tag checkboxes repeat one field name, and without it only the last survives.
+    const b = await c.req.parseBody({ all: true });
     const r = await applyOwnerEdit(d.pool, u.id, id, formToPatch(b, current), now());
-    if (!r.ok) return c.html(editPage(l, current, csrfFor(u), null, r.issues ?? [r.error]), 400);
+    if (!r.ok) return c.html(editPage(l, current, csrfFor(u), null, r.issues ?? [r.error], mediaUrl), 400);
     return c.redirect(`/owner/activities/${id}?saved=1`);
   });
 
@@ -273,12 +372,162 @@ export function ownerPages(d: Deps) {
     return c.redirect(`/owner/activities/${c.req.param("id")}?saved=1`);
   });
 
+  // ---------------------------------------------------------------- photos on a listing
+  app.post("/activities/:id/photos", async (c) => {
+    const l = lang(c);
+    const u = await owner(c);
+    if (!u) return c.redirect("/owner");
+    const id = c.req.param("id");
+    const current = (await ownerListings(d.pool, u.id)).find((r: any) => r.id === id);
+    if (!current || !d.enrich) return c.text("Not found", 404);
+    const b = await c.req.parseBody({ all: true });
+    if (b.licence !== "on") return c.html(editPage(l, current, csrfFor(u), null, [T.licenceRequired[l]], mediaUrl), 400);
+    const results = await storePhotos(d.pool, d.enrich, { type: "activity", id }, u.id, await filesOf(b.photos), now());
+    const failed = results.filter((r) => r.safety === "error").map((r) => `${r.name}: ${T[`err_${r.error}` as keyof typeof T]?.[l] ?? r.error}`);
+    if (failed.length) {
+      const fresh = (await ownerListings(d.pool, u.id)).find((r: any) => r.id === id);
+      return c.html(editPage(l, fresh, csrfFor(u), null, failed, mediaUrl), 400);
+    }
+    return c.redirect(`/owner/activities/${id}?saved=1`);
+  });
+
+  app.post("/activities/:id/photos/:mid/delete", async (c) => {
+    const u = await owner(c);
+    if (!u) return c.redirect("/owner");
+    const id = c.req.param("id");
+    if (!d.enrich || !(await canEdit(d.pool, u.id, id))) return c.text("Not found", 404);
+    await deletePhoto(d.pool, d.enrich, c.req.param("mid"), id);
+    return c.redirect(`/owner/activities/${id}`);
+  });
+
+  // ---------------------------------------------------------------- self-serve onboarding
+  app.get("/new", async (c) => {
+    const l = lang(c);
+    const u = await owner(c);
+    if (!u) return c.redirect("/owner");
+    return c.html(newBusinessPage(l, csrfFor(u), {}, []));
+  });
+
+  app.post("/new", async (c) => {
+    const l = lang(c), tr = t(l);
+    const u = await owner(c);
+    if (!u) return c.redirect("/owner");
+    if (!d.enrich) return c.text("Onboarding is not configured on this server.", 503);
+    const b = await c.req.parseBody();
+    const form = {
+      name: String(b.name ?? "").trim().slice(0, 120),
+      website: String(b.website ?? "").trim().slice(0, 300),
+      address: String(b.address ?? "").trim().slice(0, 200),
+      pitch: String(b.pitch ?? "").trim().slice(0, 300),
+    };
+    const errors: string[] = [];
+    if (form.name.length < 2) errors.push(tr("errName"));
+    if (form.address.length < 5) errors.push(tr("errAddress"));
+    let website: string | null = null;
+    if (form.website) {
+      try { website = checkUrl(form.website.includes("://") ? form.website : `https://${form.website}`).toString(); }
+      catch { errors.push(tr("errWebsite")); }
+    }
+    if (errors.length) return c.html(newBusinessPage(l, csrfFor(u), form, errors), 400);
+
+    let place;
+    try { place = (await d.enrich.geocoder.search(`${form.address}, Montréal, QC`))[0]; } catch { place = undefined; }
+    if (!place) return c.html(newBusinessPage(l, csrfFor(u), form, [tr("errNotFound")]), 400);
+
+    if (b.notDuplicate !== "1") {
+      const dups = await findDuplicateVenues(d.pool, { name: form.name, lat: place.lat, lon: place.lon, website });
+      if (dups.length) return c.html(duplicatePage(l, csrfFor(u), form, dups));
+    }
+    if (!(await jobAllowance(d.pool, d.enrich, u.id, now()))) {
+      return c.html(newBusinessPage(l, csrfFor(u), form, [tr("errLimit")]), 429);
+    }
+    const jobId = await createJob(d.pool, "onboarding", {
+      name: form.name, pitch: form.pitch || null, website, address: place.line1 || form.address,
+      lat: place.lat, lon: place.lon, neighbourhood: place.neighbourhood,
+    }, u.id);
+    d.enrich.kick?.();
+    return c.redirect(`/owner/drafts/${jobId}`);
+  });
+
+  const ownJob = async (userId: string, id: string) => {
+    if (!UUID_RE.test(id)) return null;
+    const { rows } = await d.pool.query(`SELECT * FROM enrichment_jobs WHERE id = $1 AND requested_by = $2 AND origin = 'onboarding'`, [id, userId]);
+    return rows[0] ?? null;
+  };
+
+  app.get("/drafts/:id", async (c) => {
+    const l = lang(c);
+    const u = await owner(c);
+    if (!u) return c.redirect("/owner");
+    const job = await ownJob(u.id, c.req.param("id"));
+    if (!job) return c.text("Not found", 404);
+    if (job.status === "published") return c.redirect("/owner");
+    if (job.status !== "ready") return c.html(progressPage(l, job, csrfFor(u)));
+    const photos = (await d.pool.query(
+      `SELECT id, storage_key AS key, safety_status AS status, is_hero AS hero FROM media
+        WHERE owner_type = 'job' AND owner_id = $1 ORDER BY sort_order`, [job.id])).rows;
+    return c.html(reviewPage(l, job, csrfFor(u), [], null, photos, mediaUrl));
+  });
+
+  app.post("/drafts/:id", async (c) => {
+    const l = lang(c), tr = t(l);
+    const u = await owner(c);
+    if (!u) return c.redirect("/owner");
+    const job = await ownJob(u.id, c.req.param("id"));
+    if (!job || job.status !== "ready" || !d.enrich) return c.text("Not found", 404);
+    const b = await c.req.parseBody({ all: true });
+
+    const errors: string[] = [];
+    const files = await filesOf(b.photos);
+    if (files.length) {
+      if (b.licence !== "on") errors.push(tr("licenceRequired"));
+      else {
+        const results = await storePhotos(d.pool, d.enrich, { type: "job", id: job.id }, u.id, files, now());
+        for (const r of results) if (r.safety === "error") errors.push(`${r.name}: ${T[`err_${r.error}` as keyof typeof T]?.[l] ?? r.error}`);
+      }
+    }
+    const review = formToReview(b, job.draft);
+    if (!errors.length) {
+      const r = await publishOnboarding(d.pool, job, { id: u.id, email: u.email }, review, now());
+      if (r.ok) return c.redirect(`/owner?published=${r.status}`);
+      errors.push(...r.errors);
+    }
+    const photos = (await d.pool.query(
+      `SELECT id, storage_key AS key, safety_status AS status, is_hero AS hero FROM media
+        WHERE owner_type = 'job' AND owner_id = $1 ORDER BY sort_order`, [job.id])).rows;
+    return c.html(reviewPage(l, job, csrfFor(u), errors, b, photos, mediaUrl), 400);
+  });
+
+  app.post("/drafts/:id/discard", async (c) => {
+    const u = await owner(c);
+    if (!u) return c.redirect("/owner");
+    const job = await ownJob(u.id, c.req.param("id"));
+    if (job && job.status !== "published") {
+      await d.pool.query(`UPDATE enrichment_jobs SET status = 'discarded', updated_at = $2 WHERE id = $1`, [job.id, now()]);
+    }
+    return c.redirect("/owner");
+  });
+
   return app;
 }
 
 // -------------------------------------------------------------------- rendering
 
-function editPage(l: L, x: any, csrf: string, notice: "saved" | null, errors: string[]) {
+type Hint = { confidence: number; evidence: string } | null | undefined;
+export interface Hints {
+  price?: Hint; duration?: Hint; hours?: Hint; minAge?: Hint; weather?: Hint; bring?: Hint;
+  tags?: Record<string, { confidence: number; evidence: string }>;
+  a11y?: { slug: string; says: "yes" | "no"; evidence: string }[];
+}
+
+function hintLine(l: L, h: Hint) {
+  if (!h) return "";
+  const level = h.confidence >= 0.85 ? T.confHigh[l] : T.confMedium[l];
+  return html`<small class="hint">✦ ${T.fromSite[l]} « ${h.evidence} » · ${level}</small>`;
+}
+
+/** The listing fields shared by the edit page and the onboarding review (prefixed per activity). */
+function listingFields(l: L, x: any, prefix = "", hints: Hints = {}) {
   const tr = (k: keyof typeof T) => T[k][l];
   const tax = loadTaxonomy();
   const lbl = (tag: { fr: string; en: string }) => (l === "fr" ? tag.fr : tag.en);
@@ -287,9 +536,83 @@ function editPage(l: L, x: any, csrf: string, notice: "saved" | null, errors: st
   const tags = new Set<string>(x.tags ?? []);
   const content = (loc: string) => x.content?.[loc] ?? {};
   const dollars = (cents: number | null) => (cents == null ? "" : String(cents / 100));
+  const n = (k: string) => `${prefix}${k}`;
+  const weather = ["indoor", "covered", "outdoor", "either"] as const;
+  return html`
+      ${["fr-CA", "en-CA"].map((loc) => html`
+        <fieldset class="card"><legend>${loc === "fr-CA" ? "Français" : "English"}</legend>
+          <label>${tr("titleF")}<input name="${n(`title_${loc}`)}" value="${content(loc).title ?? ""}" maxlength="90" ${loc === "fr-CA" ? "required" : ""}></label>
+          <label>${tr("summary")}<input name="${n(`summary_${loc}`)}" value="${content(loc).summary ?? ""}" maxlength="160"></label>
+          <label>${tr("description")}<textarea name="${n(`description_${loc}`)}" rows="4" maxlength="2000">${content(loc).description ?? ""}</textarea></label>
+          <label>${tr("bring")}<input name="${n(`whatToBring_${loc}`)}" value="${content(loc).whatToBring ?? ""}" maxlength="300"></label>
+        </fieldset>`)}
+      <fieldset class="card"><legend>${tr("practical")}</legend>
+        <label class="check"><input type="checkbox" name="${n("isFree")}" ${x.is_free ? "checked" : ""}> ${tr("free")}</label>
+        <div class="row">
+          <label>${tr("priceMin")}<input name="${n("priceMin")}" type="number" min="0" step="0.5" value="${dollars(x.price_min_cents)}"></label>
+          <label>${tr("priceMax")}<input name="${n("priceMax")}" type="number" min="0" step="0.5" value="${dollars(x.price_max_cents)}"></label>
+        </div>
+        ${hintLine(l, hints.price)}
+        <label>${tr("duration")}<input name="${n("duration")}" type="number" min="5" max="1440" value="${x.typical_duration_minutes ?? ""}"></label>
+        ${hintLine(l, hints.duration)}
+        <label>${tr("hours")}<input name="${n("openingHours")}" value="${x.opening_hours ?? ""}" placeholder="Mo-Fr 09:00-17:00">
+          <small class="muted">${tr("hoursHint")}</small></label>
+        ${hintLine(l, hints.hours)}
+        <div class="row">
+          <label>${tr("minAge")}<input name="${n("minAge")}" type="number" min="0" max="99" value="${x.min_age ?? ""}"></label>
+          <label>${tr("weatherF")}<select name="${n("weather")}">
+            <option value="">—</option>
+            ${weather.map((w) => html`<option value="${w}" ${x.weather_dependency === w ? "selected" : ""}>${tr(`w_${w}` as keyof typeof T)}</option>`)}
+          </select></label>
+        </div>
+        ${hintLine(l, hints.minAge)}
+      </fieldset>
+      <fieldset class="card"><legend>${tr("a11y")}</legend>
+        <p class="muted">${tr("a11yHint")}</p>
+        ${a11y.map((tag) => {
+          const v = x.a11y?.[tag.slug];
+          const val = v === true ? "yes" : v === false ? "no" : "unknown";
+          const mention = hints.a11y?.find((m) => m.slug === tag.slug);
+          return html`<div class="tri"><span>${lbl(tag)}${mention ? html`<small class="hint">✦ ${T.siteSays[l]} « ${mention.evidence} » — ${T.pleaseConfirm[l]}</small>` : ""}</span>
+            ${(["yes", "no", "unknown"] as const).map((o) => html`<label class="check"><input type="radio" name="${n(`a11y_${tag.slug}`)}" value="${o}" ${val === o ? "checked" : ""}> ${tr(o)}</label>`)}
+          </div>`;
+        })}
+      </fieldset>
+      <fieldset class="card"><legend>${tr("tags")}</legend>
+        ${facets.map((f) => html`<div class="facet"><strong>${FACET_LABELS[f.key]?.[l] ?? f.key}</strong>
+          ${(f.tags ?? []).map((tag) => {
+            const h = hints.tags?.[tag.slug];
+            return html`<label class="check" ${h ? html`title="${h.evidence}"` : ""}><input type="checkbox" name="${n("tag")}" value="${tag.slug}" ${tags.has(tag.slug) ? "checked" : ""}> ${lbl(tag)}${h ? " ✦" : ""}</label>`;
+          })}
+        </div>`)}
+      </fieldset>`;
+}
 
+function photoSection(l: L, x: any, csrf: string, mediaUrl: (key: string) => string) {
+  const photos: any[] = x.photos ?? [];
+  return html`
+    <section class="card"><h2>${T.photos[l]}</h2>
+      ${photos.length ? html`<div class="photos">${photos.map((p) => html`
+        <figure>${p.status === "rejected" ? html`<div class="ph-none"></div>` : html`<img src="${mediaUrl(p.key)}" alt="" loading="lazy">`}
+          <figcaption>${p.hero ? `★ ${T.hero[l]} · ` : ""}${T[`ph_${p.status}` as keyof typeof T][l]}</figcaption>
+          <form method="post" action="/owner/activities/${x.id}/photos/${p.id}/delete"><input type="hidden" name="_csrf" value="${csrf}"><button class="link">${T.remove[l]}</button></form>
+        </figure>`)}</div>` : html`<p class="muted">${T.noPhotos[l]}</p>`}
+      <form method="post" action="/owner/activities/${x.id}/photos" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="${csrf}">
+        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple>
+        <label class="check"><input type="checkbox" name="licence" required> ${T.licence[l]}</label>
+        <p class="muted small">${T.photoRules[l]}</p>
+        <button class="secondary">${T.upload[l]}</button>
+      </form>
+    </section>`;
+}
+
+function editPage(l: L, x: any, csrf: string, notice: "saved" | null, errors: string[], mediaUrl: (key: string) => string) {
+  const tr = (k: keyof typeof T) => T[k][l];
+  const content = (loc: string) => x.content?.[loc] ?? {};
   return page(l, content(l === "fr" ? "fr-CA" : "en-CA").title ?? x.slug, html`
-    <p><a href="/owner">${tr("back")}</a> · <span class="muted">${x.venue_name}</span></p>
+    <p><a href="/owner">${tr("back")}</a> · <span class="muted">${x.venue_name}</span>
+      ${x.status === "pending_review" ? html` · <span class="badge">${tr("awaitingReview")}</span>` : ""}</p>
     ${notice ? html`<p class="card ok">${tr("saved")}</p>` : ""}
     ${errors.length ? html`<div class="card error"><strong>${tr("errors")}</strong><ul>${errors.map((e) => html`<li>${e}</li>`)}</ul></div>` : ""}
     <form method="post" action="/owner/activities/${x.id}/confirm" class="inline">
@@ -297,47 +620,17 @@ function editPage(l: L, x: any, csrf: string, notice: "saved" | null, errors: st
       <button class="secondary">✓ ${tr("stillAccurate")}</button>
       <span class="muted">${tr("lastVerified")} : ${x.last_verified_at ? fmtDate(x.last_verified_at, l) : tr("never")}</span>
     </form>
+    ${photoSection(l, x, csrf, mediaUrl)}
     <form method="post" action="/owner/activities/${x.id}">
       <input type="hidden" name="_csrf" value="${csrf}">
-      ${["fr-CA", "en-CA"].map((loc) => html`
-        <fieldset class="card"><legend>${loc === "fr-CA" ? "Français" : "English"}</legend>
-          <label>${tr("titleF")}<input name="title_${loc}" value="${content(loc).title ?? ""}" maxlength="90" ${loc === "fr-CA" ? "required" : ""}></label>
-          <label>${tr("summary")}<input name="summary_${loc}" value="${content(loc).summary ?? ""}" maxlength="160"></label>
-          <label>${tr("description")}<textarea name="description_${loc}" rows="4" maxlength="2000">${content(loc).description ?? ""}</textarea></label>
-          <label>${tr("bring")}<input name="whatToBring_${loc}" value="${content(loc).whatToBring ?? ""}" maxlength="300"></label>
-        </fieldset>`)}
-      <fieldset class="card"><legend>${tr("priceMin").split(" ")[0]}</legend>
-        <label class="check"><input type="checkbox" name="isFree" ${x.is_free ? "checked" : ""}> ${tr("free")}</label>
-        <div class="row">
-          <label>${tr("priceMin")}<input name="priceMin" type="number" min="0" step="0.5" value="${dollars(x.price_min_cents)}"></label>
-          <label>${tr("priceMax")}<input name="priceMax" type="number" min="0" step="0.5" value="${dollars(x.price_max_cents)}"></label>
-        </div>
-        <label>${tr("duration")}<input name="duration" type="number" min="5" max="1440" value="${x.typical_duration_minutes ?? ""}"></label>
-        <label>${tr("hours")}<input name="openingHours" value="${x.opening_hours ?? ""}" placeholder="Mo-Fr 09:00-17:00">
-          <small class="muted">${tr("hoursHint")}</small></label>
-      </fieldset>
-      <fieldset class="card"><legend>${tr("a11y")}</legend>
-        <p class="muted">${tr("a11yHint")}</p>
-        ${a11y.map((tag) => {
-          const v = x.a11y?.[tag.slug];
-          const val = v === true ? "yes" : v === false ? "no" : "unknown";
-          return html`<div class="tri"><span>${lbl(tag)}</span>
-            ${(["yes", "no", "unknown"] as const).map((o) => html`<label class="check"><input type="radio" name="a11y_${tag.slug}" value="${o}" ${val === o ? "checked" : ""}> ${tr(o)}</label>`)}
-          </div>`;
-        })}
-      </fieldset>
-      <fieldset class="card"><legend>${tr("tags")}</legend>
-        ${facets.map((f) => html`<div class="facet"><strong>${f.key}</strong>
-          ${(f.tags ?? []).map((tag) => html`<label class="check"><input type="checkbox" name="tag" value="${tag.slug}" ${tags.has(tag.slug) ? "checked" : ""}> ${lbl(tag)}</label>`)}
-        </div>`)}
-      </fieldset>
+      ${listingFields(l, x)}
       <button>${tr("save")}</button>
     </form>`);
 }
 
 /** Map the flat form fields back onto an OwnerPatch. Only differences become tag changes. */
-export function formToPatch(b: Record<string, unknown>, current: any): OwnerPatch {
-  const str = (k: string) => (typeof b[k] === "string" ? (b[k] as string).trim() : "");
+export function formToPatch(b: Record<string, unknown>, current: any, prefix = ""): OwnerPatch {
+  const str = (k: string) => (typeof b[prefix + k] === "string" ? (b[prefix + k] as string).trim() : "");
   const cents = (k: string) => (str(k) === "" ? null : Math.round(Number(str(k)) * 100));
   const content: NonNullable<OwnerPatch["content"]> = {};
   for (const loc of ["fr-CA", "en-CA"] as const) {
@@ -352,28 +645,196 @@ export function formToPatch(b: Record<string, unknown>, current: any): OwnerPatc
   }
   const a11y: Record<string, boolean | null> = {};
   for (const [k, v] of Object.entries(b)) {
-    if (!k.startsWith("a11y_")) continue;
-    const slug = k.slice(5);
+    if (!k.startsWith(`${prefix}a11y_`)) continue;
+    const slug = k.slice(prefix.length + 5);
     const next = v === "yes" ? true : v === "no" ? false : null;
     const prev = current.a11y?.[slug] ?? null;
     if (next !== prev) a11y[slug] = next;
   }
-  const raw = b.tag;
+  const raw = b[`${prefix}tag`];
   const wanted = new Set(Array.isArray(raw) ? raw.map(String) : typeof raw === "string" ? [raw] : []);
   const had = new Set<string>(current.tags ?? []);
   const editable = new Set(loadTaxonomy().facets.filter((f) => EDITABLE_FACETS.includes(f.key)).flatMap((f) => (f.tags ?? []).map((t) => t.slug)));
   const duration = str("duration");
+  const minAge = str("minAge");
+  const weather = str("weather");
   return {
     ...(Object.keys(content).length ? { content } : {}),
-    isFree: b.isFree === "on",
+    isFree: b[`${prefix}isFree`] === "on",
     priceMinCents: cents("priceMin"),
     priceMaxCents: cents("priceMax"),
     typicalDurationMinutes: duration ? Number(duration) : null,
     openingHours: str("openingHours") || null,
+    minAge: minAge ? Number(minAge) : null,
+    weather: (["indoor", "covered", "outdoor", "either"].includes(weather) ? weather : null) as OwnerPatch["weather"],
     ...(Object.keys(a11y).length ? { a11y } : {}),
     tagsAdd: [...wanted].filter((s) => !had.has(s) && editable.has(s)),
     tagsRemove: [...had].filter((s) => !wanted.has(s) && editable.has(s)),
   };
+}
+
+// -------------------------------------------------------------------- onboarding pages
+
+async function filesOf(v: unknown): Promise<{ name: string; bytes: Buffer }[]> {
+  const list = Array.isArray(v) ? v : v === undefined ? [] : [v];
+  const out: { name: string; bytes: Buffer }[] = [];
+  for (const f of list) {
+    if (f instanceof File && f.size > 0) out.push({ name: f.name.slice(0, 80), bytes: Buffer.from(await f.arrayBuffer()) });
+  }
+  return out;
+}
+
+function newBusinessPage(l: L, csrf: string, form: Record<string, string>, errors: string[]) {
+  const tr = (k: keyof typeof T) => T[k][l];
+  return page(l, tr("newTitle"), html`
+    <p class="muted">${tr("newIntro")}</p>
+    ${errors.length ? html`<div class="card error"><ul>${errors.map((e) => html`<li>${e}</li>`)}</ul></div>` : ""}
+    <form method="post" action="/owner/new" class="card">
+      <input type="hidden" name="_csrf" value="${csrf}">
+      <label>${tr("nameF")}<input name="name" value="${form.name ?? ""}" required minlength="2" maxlength="120"></label>
+      <label>${tr("websiteF")}<input name="website" value="${form.website ?? ""}" inputmode="url" placeholder="https://" maxlength="300"></label>
+      <label>${tr("addressF")}<input name="address" value="${form.address ?? ""}" required minlength="5" maxlength="200" autocomplete="street-address"></label>
+      <label>${tr("pitchF")}<input name="pitch" value="${form.pitch ?? ""}" maxlength="300"></label>
+      <button>${tr("draftIt")}</button>
+    </form>
+    <p><a href="/owner">${tr("back")}</a></p>`);
+}
+
+function duplicatePage(l: L, csrf: string, form: Record<string, string>, dups: DuplicateVenue[]) {
+  const tr = (k: keyof typeof T) => T[k][l];
+  return page(l, tr("dupTitle"), html`
+    <p>${tr("dupIntro")}</p>
+    ${dups.map((v) => html`<div class="card"><h2>${v.name}</h2><p class="muted">${v.address ?? ""}</p>
+      <a class="button" href="/owner/claim?q=${encodeURIComponent(v.name)}">${tr("claimThis")}</a></div>`)}
+    <form method="post" action="/owner/new">
+      <input type="hidden" name="_csrf" value="${csrf}">
+      ${Object.entries(form).map(([k, v]) => html`<input type="hidden" name="${k}" value="${v}">`)}
+      <input type="hidden" name="notDuplicate" value="1">
+      <button class="secondary">${tr("notMe")}</button>
+    </form>`);
+}
+
+function progressPage(l: L, job: any, csrf: string) {
+  const tr = (k: keyof typeof T) => T[k][l];
+  if (job.status === "failed" || job.status === "discarded") {
+    return page(l, tr("newTitle"), html`<p class="card error">${tr("failed")}</p><p><a href="/owner">${tr("back")}</a></p>`);
+  }
+  const steps = job.input.website ? ["fetching", "extracting", "writing"] : ["extracting", "writing"];
+  const at = Math.max(0, steps.indexOf(job.status));
+  return page(l, tr("working"), html`
+    <ol class="steps">${steps.map((st, i) => html`<li class="${i < at ? "done" : i === at ? "now" : ""}">${tr(`step_${st}` as keyof typeof T)}</li>`)}</ol>
+    <form method="post" action="/owner/drafts/${job.id}/discard"><input type="hidden" name="_csrf" value="${csrf}"><button class="link">${tr("discard")}</button></form>`,
+    raw(`<meta http-equiv="refresh" content="2">`));
+}
+
+/** Form state for one draft activity: what the owner sees pre-filled. */
+function draftState(a: DraftActivity) {
+  const copy = { ...a.copy } as any;
+  if (a.whatToBring && copy["fr-CA"] && !copy["fr-CA"].whatToBring) copy["fr-CA"] = { ...copy["fr-CA"], whatToBring: a.whatToBring.value };
+  return {
+    content: copy,
+    is_free: a.price?.value.isFree ?? false,
+    price_min_cents: a.price?.value.minCents ?? null,
+    price_max_cents: a.price?.value.maxCents ?? null,
+    typical_duration_minutes: a.durationMinutes?.value ?? null,
+    opening_hours: a.openingHours?.value ?? null,
+    min_age: a.minAge?.value ?? null,
+    weather_dependency: a.weather?.value ?? null,
+    a11y: {},                                          // never pre-filled: only the owner answers
+    tags: a.tags.map((t) => t.slug),
+  };
+}
+
+/** Form state rebuilt from a submitted form, so a failed publish shows what the owner typed. */
+function submittedState(p: OwnerPatch) {
+  return {
+    content: p.content ?? {}, is_free: p.isFree ?? false, price_min_cents: p.priceMinCents ?? null,
+    price_max_cents: p.priceMaxCents ?? null, typical_duration_minutes: p.typicalDurationMinutes ?? null,
+    opening_hours: p.openingHours ?? null, min_age: p.minAge ?? null, weather_dependency: p.weather ?? null,
+    a11y: p.a11y ?? {}, tags: p.tagsAdd ?? [],
+  };
+}
+
+const KIND_KEYS = ["place", "recurring_program", "scheduled_event", "self_guided", "seasonal"] as const;
+
+export function formToReview(b: Record<string, unknown>, draft: Draft): Review {
+  const str = (k: string) => (typeof b[k] === "string" ? (b[k] as string).trim() : "");
+  const activities: Review["activities"] = [];
+  draft.activities.forEach((a, i) => {
+    const p = `a${i}_`;
+    if (b[`${p}include`] !== "on") return;
+    activities.push({
+      key: a.key,
+      kind: (KIND_KEYS as readonly string[]).includes(str(`${p}kind`)) ? (str(`${p}kind`) as Review["activities"][number]["kind"]) : "place",
+      primaryCategory: str(`${p}category`),
+      patch: formToPatch(b, { tags: [], a11y: {} }, p),
+    });
+  });
+  return {
+    activities,
+    phone: str("phone") || null,
+    confirmPrice: b.confirmPrice === "on",
+    confirmA11y: b.confirmA11y === "on",
+    expressConsent: b.consent === "on",
+  };
+}
+
+function reviewPage(l: L, job: any, csrf: string, errors: string[], submitted: Record<string, unknown> | null, photos: any[], mediaUrl: (k: string) => string) {
+  const tr = (k: keyof typeof T) => T[k][l];
+  const draft = job.draft as Draft;
+  const lbl = (tag: { fr: string; en: string }) => (l === "fr" ? tag.fr : tag.en);
+  const categories = facet(loadTaxonomy(), "category").tags ?? [];
+  const review = submitted ? formToReview(submitted, draft) : null;
+  const note = draft.note ? T[`note_${draft.note}` as keyof typeof T]?.[l] : null;
+
+  return page(l, tr("reviewTitle"), html`
+    <p class="muted">${tr("reviewIntro")}</p>
+    ${note ? html`<p class="card">${note}</p>` : ""}
+    ${errors.length ? html`<div class="card error"><strong>${tr("errors")}</strong><ul>${errors.map((e) => html`<li>${e}</li>`)}</ul></div>` : ""}
+    <p class="muted">${tr("location")} : ${job.input.address ?? ""} ${job.input.neighbourhood ? `· ${job.input.neighbourhood}` : ""}
+      · <a href="https://www.openstreetmap.org/?mlat=${job.input.lat}&mlon=${job.input.lon}#map=18/${job.input.lat}/${job.input.lon}" target="_blank" rel="noopener">OSM ↗</a></p>
+    <form method="post" action="/owner/drafts/${job.id}" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="${csrf}">
+      ${draft.activities.map((a, i) => {
+        const p = `a${i}_`;
+        const r = review?.activities.find((x) => x.key === a.key);
+        const included = submitted ? submitted[`${p}include`] === "on" : true;
+        const state = r ? submittedState(r.patch) : draftState(a);
+        const kind = r?.kind ?? a.kind;
+        const category = r?.primaryCategory ?? a.primaryCategory?.value ?? "";
+        const hints = {
+          price: a.price, duration: a.durationMinutes, hours: a.openingHours, minAge: a.minAge, weather: a.weather,
+          tags: Object.fromEntries(a.tags.map((t) => [t.slug, t])), a11y: a.a11yMentions,
+        };
+        return html`<section class="activity">
+          <h2>${a.name}</h2>
+          <label class="check"><input type="checkbox" name="${p}include" ${included ? "checked" : ""}> ${tr("include")}</label>
+          <div class="card">
+            <div class="row">
+              <label>${tr("kindF")}<select name="${p}kind">${KIND_KEYS.map((k) => html`<option value="${k}" ${kind === k ? "selected" : ""}>${tr(`k_${k}` as keyof typeof T)}</option>`)}</select></label>
+              <label>${tr("categoryF")}<select name="${p}category"><option value="">${tr("chooseCategory")}</option>
+                ${categories.map((c) => html`<option value="${c.slug}" ${category === c.slug ? "selected" : ""}>${lbl(c)}</option>`)}</select></label>
+            </div>
+            ${a.primaryCategory ? hintLine(l, a.primaryCategory) : ""}
+          </div>
+          ${listingFields(l, state, p, hints)}
+        </section>`;
+      })}
+      <fieldset class="card"><legend>${tr("photos")}</legend>
+        ${photos.length ? html`<div class="photos">${photos.map((ph) => html`<figure>${ph.status === "rejected" ? html`<div class="ph-none"></div>` : html`<img src="${mediaUrl(ph.key)}" alt="">`}<figcaption>${tr(`ph_${ph.status}` as keyof typeof T)}</figcaption></figure>`)}</div>` : ""}
+        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple>
+        <label class="check"><input type="checkbox" name="licence" ${submitted?.licence === "on" ? "checked" : ""}> ${tr("licence")}</label>
+        <p class="muted small">${tr("photoRules")}</p>
+      </fieldset>
+      <fieldset class="card">
+        <label>${tr("phoneF")}<input name="phone" type="tel" value="${(submitted?.phone as string) ?? draft.phone ?? ""}"></label>
+        <label class="check"><input type="checkbox" name="confirmPrice" required ${submitted?.confirmPrice === "on" ? "checked" : ""}> ${tr("confirmPrice")}</label>
+        <label class="check"><input type="checkbox" name="confirmA11y" required ${submitted?.confirmA11y === "on" ? "checked" : ""}> ${tr("confirmA11y")}</label>
+        <label class="check"><input type="checkbox" name="consent" ${submitted?.consent === "on" ? "checked" : ""}> ${tr("consent")}</label>
+      </fieldset>
+      <button>${tr("publish")}</button>
+    </form>
+    <form method="post" action="/owner/drafts/${job.id}/discard"><input type="hidden" name="_csrf" value="${csrf}"><button class="link">${tr("discard")}</button></form>`);
 }
 
 function logoutForm(l: L, csrf: string) {
@@ -384,10 +845,10 @@ function fmtDate(d: Date | string, l: L) {
   return new Date(d).toLocaleDateString(l === "fr" ? "fr-CA" : "en-CA", { year: "numeric", month: "long", day: "numeric" });
 }
 
-function page(l: L, title: string, body: unknown) {
+function page(l: L, title: string, body: unknown, head: unknown = "") {
   return html`<!doctype html>
 <html lang="${l}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title} · Alentour</title>
+<title>${title} · Alentour</title>${head}
 <style>${raw(CSS)}</style></head>
 <body><header><strong>Alentour</strong> <span class="muted">${T.title[l]}</span>
 <nav><a href="?lang=${l === "fr" ? "en" : "fr"}">${l === "fr" ? "English" : "Français"}</a></nav></header>
@@ -409,5 +870,14 @@ button.secondary{background:var(--soft);color:var(--accent)}a{color:var(--accent
 .row{display:flex;gap:.75rem}.row>*{flex:1}.row button{flex:0}.inline{display:flex;gap:.75rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap}
 .tri{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;padding:.35rem 0;border-bottom:1px solid var(--rule)}.tri>span{flex:1 1 14rem}
 .facet{margin:.5rem 0}.facet strong{display:block;text-transform:capitalize;font-size:.85rem;color:var(--ink3)}
-.list{padding-left:1.1rem}.list li{margin:.35rem 0}.error{color:var(--danger)}.ok{border-color:var(--accent);color:var(--accent);font-weight:600}
+.list{padding-left:1.1rem}.list li{margin:.35rem 0}
+select{display:block;width:100%;margin-top:.25rem;padding:.55rem .6rem;border:1px solid var(--rule);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.hint{display:block;color:var(--accent);font-size:.8rem;margin:-.2rem 0 .4rem}.small{font-size:.8rem}
+.badge{display:inline-block;background:var(--soft);color:var(--accent);border-radius:99px;padding:.05rem .55rem;font-size:.8rem}
+button.link{background:none;color:var(--ink3);padding:.2rem 0;font-weight:400;text-decoration:underline}
+.photos{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:.75rem}.photos figure{margin:0;width:140px}
+.photos img,.ph-none{width:140px;height:105px;object-fit:cover;border-radius:8px;background:var(--rule);display:block}
+.photos figcaption{font-size:.8rem;color:var(--ink3)}
+.activity{border-top:2px solid var(--rule);padding-top:1rem;margin-top:1rem}
+.steps li{margin:.4rem 0;color:var(--ink3)}.steps li.done{color:var(--accent)}.steps li.done::after{content:" ✓"}.steps li.now{color:var(--ink);font-weight:600}.steps li.now::after{content:" …"}.error{color:var(--danger)}.ok{border-color:var(--accent);color:var(--accent);font-weight:600}
 `;

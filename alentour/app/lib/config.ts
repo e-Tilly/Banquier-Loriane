@@ -21,7 +21,11 @@ export const config = {
   /** Where "Report a problem" goes when there is no API yet. */
   supportEmail: clean(process.env.EXPO_PUBLIC_SUPPORT_EMAIL) ?? "allo@alentour.app",
   webUrl: clean(process.env.EXPO_PUBLIC_WEB_URL) ?? "https://alentour.app",
+  /** Public base for listing photos (R2 in production, the API's /media in development). */
+  mediaUrl: clean(process.env.EXPO_PUBLIC_MEDIA_URL) ?? "https://media.alentour.app",
 };
+
+export const mediaUrl = (key: string) => `${config.mediaUrl}/${key}`;
 
 export const catalogUrl = (locale: string) => `${config.cdnUrl}/catalog.${locale}.json`;
 export const weatherUrl = () => `${config.cdnUrl}/weather.${config.city}.json`;

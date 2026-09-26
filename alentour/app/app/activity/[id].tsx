@@ -3,13 +3,13 @@
  * know" is honest and useful; a missing row implying "no" is neither.
  */
 import React, { useMemo, useState } from "react";
-import { View, Text, ScrollView, Pressable, Linking, Share, Platform, StyleSheet } from "react-native";
+import { View, Text, ScrollView, Pressable, Linking, Share, Platform, Image, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import { haversineKm, a11yValue } from "@core/catalog/filter.ts";
 import { isOpenAt } from "@core/catalog/hours.ts";
 import { useStore } from "../../lib/store.tsx";
-import { config } from "../../lib/config.ts";
+import { config, mediaUrl } from "../../lib/config.ts";
 import { usePalette, space, radius, typography, type Palette } from "../../lib/theme.ts";
 import { formatPrice, formatDuration, formatDistance, effortLabel, formatDate } from "../../lib/format.ts";
 import { ListSheet } from "../../components/ListSheet.tsx";
@@ -71,6 +71,13 @@ export default function ActivityDetail() {
   return (
     <SafeAreaView style={s.screen} edges={["bottom"]}>
       <ScrollView contentContainerStyle={s.content}>
+        {activity.img ? (
+          <Image
+            source={{ uri: mediaUrl(activity.img.key) }}
+            style={[s.hero, activity.img.w && activity.img.h ? { aspectRatio: activity.img.w / activity.img.h } : null]}
+            accessibilityIgnoresInvertColors
+          />
+        ) : null}
         <Text style={s.kicker}>{catalog.tagLabels[activity.cat] ?? activity.cat}</Text>
         <Text style={s.title}>{activity.title}</Text>
         {activity.summary ? <Text style={s.summary}>{activity.summary}</Text> : null}
@@ -184,6 +191,7 @@ const styles = (p: Palette) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: p.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: p.bg },
   content: { padding: space.lg, gap: space.lg, paddingBottom: space.xxl },
+  hero: { width: "100%", aspectRatio: 4 / 3, maxHeight: 360, borderRadius: radius.lg, backgroundColor: p.surfaceAlt },
   kicker: { ...typography.micro, color: p.accent, textTransform: "uppercase" },
   title: { ...typography.display, color: p.ink, marginTop: -space.sm },
   summary: { ...typography.body, color: p.ink2, marginTop: -space.sm },
