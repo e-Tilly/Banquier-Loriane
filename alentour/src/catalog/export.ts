@@ -211,22 +211,15 @@ function round(n: number, places: number): number {
 
 // ------------------------------------------------------------------ CLI
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
-  const locale = argValue(args, "--locale") ?? "fr-CA";
-  const outDir = argValue(args, "--out") ?? "./out";
-
-  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+/** Build, validate and write one locale. Returns false (and writes nothing) on failure. */
+export async function exportLocale(pool: pg.Pool, locale: string, outDir: string): Promise<boolean> {
   const catalog = await buildCatalog(pool, locale);
-  await pool.end();
-
   const problems = validateCatalog(catalog);
   if (problems.length) {
-    console.error(`✗ Catalog failed validation (${problems.length} problems):`);
+    console.error(`✗ ${locale}: catalog failed validation (${problems.length} problems):`);
     for (const p of problems.slice(0, 25)) console.error(`   ${p}`);
     if (problems.length > 25) console.error(`   … and ${problems.length - 25} more`);
-    process.exitCode = 1;
-    return;                       // never write a broken catalog
+    return false;                 // never write a broken catalog
   }
 
   mkdirSync(outDir, { recursive: true });
@@ -241,6 +234,20 @@ async function main(): Promise<void> {
   console.log(`  ${file}`);
   console.log(`  ${kb(json.length)} raw → ${kb(gz.length)} gzipped` +
               `  (${(gz.length / Math.max(catalog.counts.activities, 1)).toFixed(0)} B/activity)`);
+  return true;
+}
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const outDir = argValue(args, "--out") ?? "./out";
+  const one = argValue(args, "--locale");
+  const locales = one ? [one] : loadTaxonomy().locales;
+
+  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  let ok = true;
+  for (const locale of locales) ok = (await exportLocale(pool, locale, outDir)) && ok;
+  await pool.end();
+  if (!ok) process.exitCode = 1;
 }
 
 function argValue(args: string[], flag: string): string | undefined {

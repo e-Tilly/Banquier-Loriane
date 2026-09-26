@@ -6,7 +6,7 @@ import type { CatalogFile, CatalogActivity } from "@core/catalog/types.ts";
 import { applyFilters } from "@core/catalog/filter.ts";
 import type { RankContext } from "@core/catalog/filter.ts";
 import { usePalette, space, radius, typography, type Palette } from "../lib/theme.ts";
-import type { Lang } from "../lib/format.ts";
+import { translate, type Lang, type Key } from "../lib/i18n.ts";
 
 interface Props {
   visible: boolean;
@@ -26,6 +26,7 @@ const A11Y_SLUGS = [
 export function FilterSheet({ visible, onClose, catalog, filters, onChange, ctx, lang }: Props) {
   const p = usePalette();
   const s = styles(p);
+  const tr = (k: Key, v?: Record<string, string | number>) => translate(k, lang, v);
 
   // Live counts on every option: never let someone tap into an empty state.
   const countWith = (patch: Partial<Filters>): number =>
@@ -44,14 +45,14 @@ export function FilterSheet({ visible, onClose, catalog, filters, onChange, ctx,
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={s.sheet} edges={["top", "bottom"]}>
         <View style={s.header}>
-          <Text style={s.headerTitle}>{lang === "fr" ? "Filtres" : "Filters"}</Text>
+          <Text style={s.headerTitle}>{tr("sheet.title")}</Text>
           <Pressable onPress={() => onChange({ maxDistanceKm: 10 })} hitSlop={8}>
-            <Text style={s.reset}>{lang === "fr" ? "Réinitialiser" : "Reset"}</Text>
+            <Text style={s.reset}>{tr("sheet.reset")}</Text>
           </Pressable>
         </View>
 
         <ScrollView contentContainerStyle={s.content}>
-          <Section p={p} title={lang === "fr" ? "Envie de quoi ?" : "In the mood for"}>
+          <Section p={p} title={tr("sheet.mood")}>
             <View style={s.wrap}>
               {vibeTags.map((slug) => (
                 <Option
@@ -65,7 +66,7 @@ export function FilterSheet({ visible, onClose, catalog, filters, onChange, ctx,
             </View>
           </Section>
 
-          <Section p={p} title={lang === "fr" ? "Catégorie" : "Category"}>
+          <Section p={p} title={tr("sheet.category")}>
             <View style={s.wrap}>
               {categories.map((slug) => (
                 <Option
@@ -79,13 +80,12 @@ export function FilterSheet({ visible, onClose, catalog, filters, onChange, ctx,
             </View>
           </Section>
 
-          <Section p={p} title={lang === "fr" ? "Durée maximale" : "Max duration"}>
+          <Section p={p} title={tr("sheet.duration")}>
             <View style={s.wrap}>
               {[60, 120, 240, undefined].map((m) => (
                 <Option
                   key={String(m)} p={p}
-                  label={m === undefined ? (lang === "fr" ? "Peu importe" : "Any")
-                       : m < 120 ? `< 1 h` : m < 240 ? `< 2 h` : (lang === "fr" ? "Demi-journée" : "Half day")}
+                  label={m === undefined ? tr("sheet.any") : m < 120 ? "< 1 h" : m < 240 ? "< 2 h" : tr("sheet.halfDay")}
                   count={countWith({ maxDurationMinutes: m })}
                   active={filters.maxDurationMinutes === m}
                   onPress={() => onChange({ ...filters, maxDurationMinutes: m })}
@@ -94,15 +94,12 @@ export function FilterSheet({ visible, onClose, catalog, filters, onChange, ctx,
             </View>
           </Section>
 
-          <Section p={p} title={lang === "fr" ? "Effort physique" : "Physical effort"}>
+          <Section p={p} title={tr("sheet.effort")}>
             <View style={s.wrap}>
               {[0, 1, 2, undefined].map((v) => (
                 <Option
                   key={String(v)} p={p}
-                  label={v === undefined ? (lang === "fr" ? "Peu importe" : "Any")
-                       : v === 0 ? (lang === "fr" ? "Aucun" : "None")
-                       : v === 1 ? (lang === "fr" ? "Léger" : "Light")
-                       : (lang === "fr" ? "Modéré" : "Moderate")}
+                  label={v === undefined ? tr("sheet.any") : v === 0 ? tr("sheet.none") : v === 1 ? tr("sheet.light") : tr("sheet.moderate")}
                   count={countWith({ maxPhysical: v })}
                   active={filters.maxPhysical === v}
                   onPress={() => onChange({ ...filters, maxPhysical: v })}
@@ -113,10 +110,8 @@ export function FilterSheet({ visible, onClose, catalog, filters, onChange, ctx,
 
           <Section
             p={p}
-            title={lang === "fr" ? "Accessibilité" : "Accessibility"}
-            note={lang === "fr"
-              ? "Les lieux non vérifiés apparaissent séparément plutôt que d'être cachés."
-              : "Unverified places are shown separately rather than hidden."}
+            title={tr("sheet.a11y")}
+            note={tr("sheet.a11yNote")}
           >
             <View style={s.wrap}>
               {A11Y_SLUGS.filter((slug) => catalog.tagLabels[slug]).map((slug) => (
@@ -134,9 +129,7 @@ export function FilterSheet({ visible, onClose, catalog, filters, onChange, ctx,
 
         <View style={s.footer}>
           <Pressable style={s.cta} onPress={onClose} accessibilityRole="button">
-            <Text style={s.ctaText}>
-              {lang === "fr" ? "Voir" : "Show"} {countWith({})} {lang === "fr" ? "résultats" : "results"}
-            </Text>
+            <Text style={s.ctaText}>{tr("sheet.show", { n: countWith({}) })}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -169,7 +162,7 @@ function Option({ p, label, count, active, onPress }: {
       style={[s.option, active && s.optionActive, empty && s.optionEmpty]}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: active, disabled: empty }}
-      accessibilityLabel={`${label}, ${count} résultats`}
+      accessibilityLabel={`${label}, ${count}`}
     >
       <Text style={[s.optionText, active && s.optionTextActive, empty && s.optionTextEmpty]}>
         {label}

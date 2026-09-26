@@ -4,13 +4,20 @@
   "private": true,
   "type": "module",
   "description": "Alentour — a filterable dictionary of local activities. Stage 1 toolchain.",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test test/*.test.ts",
     "taxonomy:check": "node --experimental-strip-types src/taxonomy/check.ts",
     "catalog:export": "node --experimental-strip-types src/catalog/export.ts",
-    "outreach:run": "node --experimental-strip-types src/outreach/run.ts"
+    "outreach:run": "node --experimental-strip-types src/outreach/run.ts",
+    "db:migrate": "node --experimental-strip-types scripts/db.ts migrate",
+    "db:seed": "node --experimental-strip-types scripts/db.ts seed",
+    "db:reset": "node --experimental-strip-types scripts/db.ts reset",
+    "weather:publish": "node --experimental-strip-types src/weather/publish.ts",
+    "dev:weather": "node --experimental-strip-types scripts/dev-weather.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
@@ -19,6 +26,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@types/geojson": "^7946.0.16",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.11.10",
     "typescript": "^5.7.2"

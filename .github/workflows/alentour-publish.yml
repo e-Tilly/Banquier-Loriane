@@ -1,0 +1,106 @@
+# Publishes Alentour's static data to Cloudflare R2.
+#
+#   - weather: hourly. One forecast call per city per hour, never per user.
+#   - catalog: on demand (and nightly once the database is online in Stage 2).
+#
+# GitHub Actions cron is free, and R2 speaks the S3 API, so this needs no server and no paid
+# scheduler. Uploads use the AWS CLI preinstalled on ubuntu runners, pointed at R2's endpoint.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET
+#   DATABASE_URL   (catalog job only — Stage 2+, when the database is reachable from CI)
+#
+# Every job skips cleanly, with a notice, when its secrets are absent — so this file is safe
+# to merge before anything is configured.
+name: alentour-publish
+
+on:
+  schedule:
+    - cron: "7 * * * *"          # hourly, off the top of the hour to dodge the cron stampede
+  workflow_dispatch:
+    inputs:
+      catalog:
+        description: "Also export and publish the catalog"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: alentour
+
+jobs:
+  weather:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+    steps:
+      - name: Check configuration
+        id: cfg
+        run: |
+          if [ -z "$R2_BUCKET" ]; then
+            echo "::notice::R2 secrets not set — skipping weather publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.skip != 'true'
+      - uses: actions/setup-node@v4
+        if: steps.cfg.outputs.skip != 'true'
+        with: { node-version: 22, cache: npm, cache-dependency-path: alentour/package-lock.json }
+      - if: steps.cfg.outputs.skip != 'true'
+        run: npm ci
+      - name: Fetch forecast
+        if: steps.cfg.outputs.skip != 'true'
+        run: npm run weather:publish -- ./out
+      - name: Upload to R2
+        if: steps.cfg.outputs.skip != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3 cp ./out/ "s3://$R2_BUCKET/" --recursive --exclude "*" --include "weather.*.json" \
+            --endpoint-url "https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com" \
+            --content-type application/json --cache-control "public, max-age=900"
+
+  catalog:
+    if: github.event_name == 'workflow_dispatch' && inputs.catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+    steps:
+      - name: Check configuration
+        id: cfg
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$R2_BUCKET" ]; then
+            echo "::notice::DATABASE_URL or R2 secrets not set — skipping catalog publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.skip != 'true'
+      - uses: actions/setup-node@v4
+        if: steps.cfg.outputs.skip != 'true'
+        with: { node-version: 22, cache: npm, cache-dependency-path: alentour/package-lock.json }
+      - if: steps.cfg.outputs.skip != 'true'
+        run: npm ci
+      - name: Validate taxonomy
+        if: steps.cfg.outputs.skip != 'true'
+        run: npm run taxonomy:check
+      - name: Export (refuses to write an invalid catalog)
+        if: steps.cfg.outputs.skip != 'true'
+        run: npm run catalog:export -- --out ./out
+      - name: Upload to R2
+        if: steps.cfg.outputs.skip != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3 cp ./out/ "s3://$R2_BUCKET/" --recursive --exclude "*" --include "catalog.*.json" \
+            --endpoint-url "https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com" \
+            --content-type application/json --cache-control "public, max-age=3600"

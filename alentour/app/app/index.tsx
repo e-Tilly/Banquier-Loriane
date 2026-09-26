@@ -1,7 +1,7 @@
 /**
  * Home is BROWSE, not search. Context shelves first — "Free tonight", "Rainy day" — then a
- * ranked feed. Most people never open the filter sheet, which is exactly why it can be deep.
- * See docs/alentour/03-taxonomy.md and 05-discovery-and-ranking.md.
+ * ranked feed. A one-line note says WHY the order changed when the weather drove it; a feed
+ * that silently rearranges itself feels random, one that explains itself feels smart.
  */
 import React, { useMemo, useState } from "react";
 import {
@@ -13,50 +13,44 @@ import { buildShelves, buildFeed, shelfItemIds } from "@core/catalog/shelves.ts"
 import { useStore } from "../lib/store.tsx";
 import { usePalette, space, radius, typography, type Palette } from "../lib/theme.ts";
 import { ActivityCard } from "../components/ActivityCard.tsx";
-import { t } from "../lib/format.ts";
+import type { Key } from "../lib/i18n.ts";
 
 export default function Home() {
   const p = usePalette();
   const s = styles(p);
   const router = useRouter();
   const {
-    catalog, loading, error, lang, rankContext, saved, toggleSave,
+    catalog, loading, error, lang, t, rankContext, isSaved, toggleSave, conditions,
     hasPreciseLocation, requestLocation,
   } = useStore();
   const [refreshing, setRefreshing] = useState(false);
 
-  const shelves = useMemo(
-    () => (catalog ? buildShelves(catalog, rankContext) : []),
-    [catalog, rankContext],
-  );
-
+  const shelves = useMemo(() => (catalog ? buildShelves(catalog, rankContext) : []), [catalog, rankContext]);
   const feed = useMemo(
     () => (catalog ? buildFeed(catalog, rankContext, { maxDistanceKm: 15 }, 40, shelfItemIds(shelves)) : []),
     [catalog, rankContext, shelves],
   );
 
+  const weatherNote: Key | null = !conditions.fresh ? null
+    : conditions.precipitationProb > 0.5 ? "home.rainNote"
+    : conditions.tempC < -15 ? "home.coldNote"
+    : conditions.isDark ? "home.darkNote"
+    : null;
+
   if (loading) {
+    return <SafeAreaView style={s.center}><ActivityIndicator color={p.accent} /></SafeAreaView>;
+  }
+  if (error || !catalog) {
     return (
       <SafeAreaView style={s.center}>
-        <ActivityIndicator color={p.accent} />
+        <Text style={s.errorTitle}>{t("home.unavailable")}</Text>
+        <Text style={s.errorBody}>{t("home.unavailableBody")}</Text>
       </SafeAreaView>
     );
   }
 
-  if (error || !catalog) {
-    return (
-      <SafeAreaView style={s.center}>
-        <Text style={s.errorTitle}>
-          {lang === "fr" ? "Catalogue indisponible" : "Catalog unavailable"}
-        </Text>
-        <Text style={s.errorBody}>
-          {lang === "fr"
-            ? "Vérifie ta connexion. Le catalogue se garde en mémoire une fois téléchargé."
-            : "Check your connection. The catalog is cached once downloaded."}
-        </Text>
-      </SafeAreaView>
-    );
-  }
+  const h = rankContext.now.getHours();
+  const kicker = t(h < 12 ? "home.morning" : h < 17 ? "home.afternoon" : "home.evening");
 
   return (
     <SafeAreaView style={s.screen} edges={["top"]}>
@@ -65,74 +59,60 @@ export default function Home() {
         keyExtractor={(item) => item.activity.id}
         contentContainerStyle={s.list}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing} tintColor={p.ink3}
-            onRefresh={() => { setRefreshing(true); setTimeout(() => setRefreshing(false), 600); }}
-          />
+          <RefreshControl refreshing={refreshing} tintColor={p.ink3}
+            onRefresh={() => { setRefreshing(true); setTimeout(() => setRefreshing(false), 600); }} />
         }
         ListHeaderComponent={
           <View style={s.header}>
             <View style={s.titleRow}>
               <View style={{ flex: 1 }}>
-                <Text style={s.kicker}>{greeting(rankContext.now, lang)}</Text>
-                <Text style={s.title}>
-                  {lang === "fr" ? "Quoi faire proche" : "What to do nearby"}
-                </Text>
+                <Text style={s.kicker}>{kicker}</Text>
+                <Text style={s.title}>{t("home.title")}</Text>
               </View>
-              <Link href="/saved" asChild>
-                <Pressable hitSlop={10} accessibilityRole="button" accessibilityLabel="Enregistrés">
-                  <Text style={s.savedGlyph}>★</Text>
-                </Pressable>
-              </Link>
+              <View style={s.iconRow}>
+                <IconLink p={p} href="/map" glyph="◎" label={t("nav.map")} />
+                <IconLink p={p} href="/saved" glyph="★" label={t("nav.saved")} />
+                <IconLink p={p} href="/settings" glyph="⚙" label={t("nav.settings")} />
+              </View>
             </View>
+
+            {weatherNote ? (
+              <View style={s.weather} accessibilityRole="text">
+                <Text style={s.weatherText}>{t(weatherNote)}</Text>
+              </View>
+            ) : null}
 
             {!hasPreciseLocation ? (
               <Pressable style={s.locBanner} onPress={requestLocation} accessibilityRole="button">
-                <Text style={s.locText}>
-                  {lang === "fr"
-                    ? "Montrer ce qui est vraiment proche de moi"
-                    : "Show what's actually near me"}
-                </Text>
-                <Text style={s.locHint}>
-                  {lang === "fr" ? "Position approximative : Plateau" : "Approximate: Plateau"}
-                </Text>
+                <Text style={s.locText}>{t("home.locate")}</Text>
+                <Text style={s.locHint}>{t("home.approx")}</Text>
               </Pressable>
             ) : null}
 
-            <Pressable style={s.searchBtn} onPress={() => router.push("/browse")}>
-              <Text style={s.searchText}>
-                {lang === "fr" ? "Chercher et filtrer" : "Search and filter"}
-              </Text>
+            <Pressable style={s.searchBtn} onPress={() => router.push("/browse")} accessibilityRole="search">
+              <Text style={s.searchText}>{t("home.search")}</Text>
             </Pressable>
 
             {shelves.map((shelf) => (
               <View key={shelf.key} style={s.shelf}>
                 <Text style={s.shelfTitle}>{shelf.label}</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={s.shelfRow}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.shelfRow}>
                   {shelf.items.map((item) => (
                     <View key={item.activity.id} style={s.shelfCard}>
-                      <ActivityCard
-                        item={item} lang={lang} compact
-                        saved={saved.has(item.activity.id)} onToggleSave={toggleSave}
-                      />
+                      <ActivityCard item={item} lang={lang} compact
+                        saved={isSaved(item.activity.id)} onToggleSave={toggleSave} />
                     </View>
                   ))}
                 </ScrollView>
               </View>
             ))}
 
-            <Text style={s.feedTitle}>
-              {lang === "fr" ? "Tout ce qu'il y a autour" : "Everything around you"}
-            </Text>
+            <Text style={s.feedTitle}>{t("home.everything")}</Text>
           </View>
         }
         renderItem={({ item }) => (
           <View style={s.cardWrap}>
-            <ActivityCard
-              item={item} lang={lang}
-              saved={saved.has(item.activity.id)} onToggleSave={toggleSave}
-            />
+            <ActivityCard item={item} lang={lang} saved={isSaved(item.activity.id)} onToggleSave={toggleSave} />
           </View>
         )}
       />
@@ -140,10 +120,15 @@ export default function Home() {
   );
 }
 
-function greeting(now: Date, lang: "fr" | "en"): string {
-  const h = now.getHours();
-  if (lang === "fr") return h < 12 ? "Ce matin" : h < 17 ? "Cet après-midi" : "Ce soir";
-  return h < 12 ? "This morning" : h < 17 ? "This afternoon" : "Tonight";
+function IconLink({ p, href, glyph, label }: { p: Palette; href: "/map" | "/saved" | "/settings"; glyph: string; label: string }) {
+  return (
+    <Link href={href} asChild>
+      <Pressable hitSlop={8} accessibilityRole="button" accessibilityLabel={label}
+        style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ fontSize: 22, color: p.accent }}>{glyph}</Text>
+      </Pressable>
+    </Link>
+  );
 }
 
 const styles = (p: Palette) => StyleSheet.create({
@@ -156,11 +141,10 @@ const styles = (p: Palette) => StyleSheet.create({
   titleRow: { flexDirection: "row", alignItems: "flex-start", paddingHorizontal: space.lg, paddingTop: space.sm },
   kicker: { ...typography.micro, color: p.accent, textTransform: "uppercase" },
   title: { ...typography.display, color: p.ink, marginTop: 2 },
-  savedGlyph: { fontSize: 24, color: p.accent },
-  locBanner: {
-    marginHorizontal: space.lg, padding: space.md, borderRadius: radius.md,
-    backgroundColor: p.accentSoft, gap: 2,
-  },
+  iconRow: { flexDirection: "row", gap: 2 },
+  weather: { marginHorizontal: space.lg, paddingVertical: space.sm, paddingHorizontal: space.md, borderRadius: radius.md, backgroundColor: p.warmSoft },
+  weatherText: { ...typography.small, color: p.warm, fontWeight: "600" },
+  locBanner: { marginHorizontal: space.lg, padding: space.md, borderRadius: radius.md, backgroundColor: p.accentSoft, gap: 2 },
   locText: { ...typography.small, color: p.accent, fontWeight: "600" },
   locHint: { ...typography.micro, color: p.ink3 },
   searchBtn: {

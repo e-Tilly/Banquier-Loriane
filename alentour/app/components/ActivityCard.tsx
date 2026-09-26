@@ -3,7 +3,8 @@ import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Link } from "expo-router";
 import type { Scored } from "@core/catalog/filter.ts";
 import { usePalette, space, radius, typography, type Palette } from "../lib/theme.ts";
-import { formatPrice, formatDuration, formatDistance, effortLabel, t, type Lang } from "../lib/format.ts";
+import { formatPrice, formatDuration, formatDistance, effortLabel, type Lang } from "../lib/format.ts";
+import { translate } from "../lib/i18n.ts";
 
 interface Props {
   item: Scored;
@@ -37,9 +38,7 @@ export function ActivityCard({ item, lang, saved, onToggleSave, compact }: Props
 
         <View style={s.body}>
           <Text style={s.title} numberOfLines={2}>{a.title}</Text>
-          {!compact && a.summary ? (
-            <Text style={s.summary} numberOfLines={2}>{a.summary}</Text>
-          ) : null}
+          {!compact && a.summary ? <Text style={s.summary} numberOfLines={2}>{a.summary}</Text> : null}
 
           <View style={s.meta}>
             <Text style={[s.metaText, a.free && s.free]}>{price}</Text>
@@ -51,20 +50,20 @@ export function ActivityCard({ item, lang, saved, onToggleSave, compact }: Props
 
           <View style={s.badges}>
             {item.openState === "open" ? (
-              <Badge p={p} tone="accent" label={t("openNow", lang)} />
+              <Badge p={p} tone="accent" label={translate("card.open", lang)} />
             ) : item.openState === "closed" ? (
-              <Badge p={p} tone="muted" label={t("closed", lang)} />
+              <Badge p={p} tone="muted" label={translate("card.closed", lang)} />
             ) : null}
-            {item.a11yUnknown ? <Badge p={p} tone="warm" label={t("a11yUnknown", lang)} /> : null}
+            {item.a11yUnknown ? <Badge p={p} tone="warm" label={translate("card.a11yUnknown", lang)} /> : null}
           </View>
         </View>
 
         <Pressable
-          onPress={(e) => { e.stopPropagation?.(); onToggleSave(a.id); }}
+          onPress={(e) => { e.preventDefault?.(); e.stopPropagation?.(); onToggleSave(a.id); }}
           hitSlop={12}
           style={s.saveBtn}
           accessibilityRole="button"
-          accessibilityLabel={saved ? "Retirer des enregistrés" : "Enregistrer"}
+          accessibilityLabel={translate(saved ? "card.unsave" : "card.save", lang)}
           accessibilityState={{ selected: saved }}
         >
           <Text style={[s.saveGlyph, saved && s.savedGlyph]}>{saved ? "★" : "☆"}</Text>
@@ -88,8 +87,8 @@ function Badge({ p, label, tone }: { p: Palette; label: string; tone: "accent" |
   );
 }
 
-/** Stand-in until real photography exists. Categories, not emoji soup. */
-function categoryGlyph(cat: string): string {
+/** Stand-in until real photography exists. */
+export function categoryGlyph(cat: string): string {
   const map: Record<string, string> = {
     "category.sports": "⛰", "category.outdoors": "🌲", "category.water": "🛶",
     "category.winter": "❄", "category.arts": "◈", "category.learning": "✎",

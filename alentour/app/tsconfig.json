@@ -21,6 +21,10 @@
     "../src/catalog/types.ts",
     "../src/catalog/filter.ts",
     "../src/catalog/hours.ts",
-    "../src/catalog/shelves.ts"
+    "../src/catalog/shelves.ts",
+    "../src/catalog/geo.ts",
+    "../src/weather/types.ts",
+    "../src/weather/conditions.ts",
+    "../src/user/library.ts"
   ]
 }

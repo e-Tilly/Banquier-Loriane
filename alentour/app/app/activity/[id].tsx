@@ -1,16 +1,19 @@
 /**
- * Activity detail. The accessibility block is deliberately explicit about what is unknown —
- * "we don't know" is honest and useful; a missing row implying "no" is neither.
+ * Activity detail. The accessibility block is explicit about what is unknown — "we don't
+ * know" is honest and useful; a missing row implying "no" is neither.
  */
-import React, { useMemo } from "react";
-import { View, Text, ScrollView, Pressable, Linking, StyleSheet } from "react-native";
+import React, { useMemo, useState } from "react";
+import { View, Text, ScrollView, Pressable, Linking, Share, Platform, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useNavigation } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { haversineKm, a11yValue } from "@core/catalog/filter.ts";
 import { isOpenAt } from "@core/catalog/hours.ts";
 import { useStore } from "../../lib/store.tsx";
+import { config } from "../../lib/config.ts";
 import { usePalette, space, radius, typography, type Palette } from "../../lib/theme.ts";
-import { formatPrice, formatDuration, formatDistance, effortLabel, t } from "../../lib/format.ts";
+import { formatPrice, formatDuration, formatDistance, effortLabel, formatDate } from "../../lib/format.ts";
+import { ListSheet } from "../../components/ListSheet.tsx";
+import { ReportSheet } from "../../components/ReportSheet.tsx";
 
 const A11Y_SLUGS = [
   "a11y.step_free_entry", "a11y.wheelchair_throughout", "a11y.accessible_washroom",
@@ -21,11 +24,13 @@ export default function ActivityDetail() {
   const p = usePalette();
   const s = styles(p);
   const { id } = useLocalSearchParams<{ id: string }>();
-  const navigation = useNavigation();
-  const { catalog, lang, rankContext, saved, toggleSave } = useStore();
+  const { catalog, lang, t, rankContext, isSaved, toggleSave } = useStore();
+  const [listOpen, setListOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
+  // Accept either the id or the slug: shared links use the slug, which survives re-imports.
   const activity = useMemo(
-    () => catalog?.activities.find((a) => a.id === id) ?? null,
+    () => catalog?.activities.find((a) => a.id === id || a.slug === id) ?? null,
     [catalog, id],
   );
   const venue = useMemo(
@@ -33,29 +38,34 @@ export default function ActivityDetail() {
     [catalog, activity],
   );
 
-  React.useLayoutEffect(() => {
-    if (activity) navigation.setOptions({ title: "" });
-  }, [navigation, activity]);
-
   if (!catalog || !activity) {
-    return (
-      <SafeAreaView style={s.center}>
-        <Text style={s.body}>{lang === "fr" ? "Activité introuvable" : "Activity not found"}</Text>
-      </SafeAreaView>
-    );
+    return <SafeAreaView style={s.center}><Text style={s.body}>{t("detail.notFound")}</Text></SafeAreaView>;
   }
 
   const distance = haversineKm(rankContext.lat, rankContext.lon, activity.lat, activity.lon);
   const open = isOpenAt(activity.hours, rankContext.now);
-  const isSaved = saved.has(activity.id);
+  const saved = isSaved(activity.id);
   const known = A11Y_SLUGS.filter((slug) => a11yValue(activity, slug) !== null);
-  const unknown = A11Y_SLUGS.filter(
-    (slug) => catalog.tagLabels[slug] && a11yValue(activity, slug) === null,
-  );
+  const unknown = A11Y_SLUGS.filter((slug) => catalog.tagLabels[slug] && a11yValue(activity, slug) === null);
 
   const openMaps = () => {
     const label = encodeURIComponent(venue?.name ?? activity.title);
-    Linking.openURL(`https://maps.apple.com/?q=${label}&ll=${activity.lat},${activity.lon}`);
+    const url = Platform.OS === "ios"
+      ? `https://maps.apple.com/?q=${label}&ll=${activity.lat},${activity.lon}`
+      : `https://www.google.com/maps/search/?api=1&query=${activity.lat},${activity.lon}`;
+    void Linking.openURL(url);
+  };
+
+  const share = async () => {
+    const url = `${config.webUrl}/a/${activity.slug}`;
+    const message = t("detail.shareMessage", { title: activity.title });
+    try {
+      if (Platform.OS === "web" && typeof navigator !== "undefined" && "share" in navigator) {
+        await (navigator as Navigator & { share: (d: object) => Promise<void> }).share({ title: activity.title, text: message, url });
+      } else {
+        await Share.share(Platform.OS === "ios" ? { message, url } : { message: `${message}\n${url}` });
+      }
+    } catch { /* the user cancelled */ }
   };
 
   return (
@@ -66,36 +76,34 @@ export default function ActivityDetail() {
         {activity.summary ? <Text style={s.summary}>{activity.summary}</Text> : null}
 
         <View style={s.factRow}>
-          <Fact p={p} label={lang === "fr" ? "Prix" : "Price"} value={formatPrice(activity, lang) || "—"} />
-          <Fact p={p} label={lang === "fr" ? "Durée" : "Duration"} value={formatDuration(activity, lang) || "—"} />
-          <Fact p={p} label={lang === "fr" ? "Distance" : "Distance"} value={formatDistance(distance, lang)} />
-          <Fact p={p} label={lang === "fr" ? "Effort" : "Effort"} value={effortLabel(activity, lang) ?? (lang === "fr" ? "Léger" : "Light")} />
+          <Fact p={p} label={t("detail.price")} value={formatPrice(activity, lang) || "—"} />
+          <Fact p={p} label={t("detail.duration")} value={formatDuration(activity, lang) || "—"} />
+          <Fact p={p} label={t("detail.distance")} value={formatDistance(distance, lang)} />
+          <Fact p={p} label={t("detail.effort")} value={effortLabel(activity, lang) ?? t("effort.1")} />
+        </View>
+
+        <View style={s.quick}>
+          <Quick p={p} label={t("detail.share")} onPress={share} />
+          <Quick p={p} label={t("detail.addToList")} onPress={() => setListOpen(true)} />
+          <Quick p={p} label={t("detail.report")} onPress={() => setReportOpen(true)} />
         </View>
 
         {activity.description ? (
-          <Section p={p} title={lang === "fr" ? "À propos" : "About"}>
-            <Text style={s.body}>{activity.description}</Text>
-          </Section>
+          <Section p={p} title={t("detail.about")}><Text style={s.body}>{activity.description}</Text></Section>
         ) : null}
-
         {activity.whatToBring ? (
-          <Section p={p} title={lang === "fr" ? "Quoi apporter" : "What to bring"}>
-            <Text style={s.body}>{activity.whatToBring}</Text>
-          </Section>
+          <Section p={p} title={t("detail.bring")}><Text style={s.body}>{activity.whatToBring}</Text></Section>
         ) : null}
 
-        <Section p={p} title={lang === "fr" ? "Horaire" : "Hours"}>
+        <Section p={p} title={t("detail.hours")}>
           <Text style={[s.body, open === "open" && s.open, open === "closed" && s.closed]}>
-            {open === "unknown" ? t("hoursUnknown", lang)
-              : open === "open" ? t("openNow", lang) : t("closed", lang)}
+            {open === "unknown" ? t("card.hoursUnknown") : open === "open" ? t("card.open") : t("card.closed")}
           </Text>
           {activity.hours ? <Text style={s.mono}>{activity.hours}</Text> : null}
         </Section>
 
-        <Section p={p} title={lang === "fr" ? "Accessibilité" : "Accessibility"}>
-          {known.length === 0 && unknown.length === 0 ? (
-            <Text style={s.muted}>{lang === "fr" ? "Aucune information" : "No information"}</Text>
-          ) : null}
+        <Section p={p} title={t("detail.a11y")}>
+          {known.length === 0 && unknown.length === 0 ? <Text style={s.muted}>{t("detail.a11yNone")}</Text> : null}
           {known.map((slug) => {
             const v = a11yValue(activity, slug);
             return (
@@ -107,65 +115,48 @@ export default function ActivityDetail() {
           })}
           {unknown.length > 0 ? (
             <View style={s.unknownBox}>
-              <Text style={s.unknownLabel}>
-                {lang === "fr" ? "Non vérifié :" : "Not verified:"}
-              </Text>
-              <Text style={s.muted}>
-                {unknown.map((slug) => catalog.tagLabels[slug]).join(", ")}
-              </Text>
-              <Text style={s.unknownNote}>
-                {lang === "fr"
-                  ? "Non vérifié ne veut pas dire inaccessible. Appelle avant de te déplacer."
-                  : "Not verified doesn't mean inaccessible. Call ahead."}
-              </Text>
+              <Text style={s.unknownLabel}>{t("detail.a11yUnverified")}</Text>
+              <Text style={s.muted}>{unknown.map((slug) => catalog.tagLabels[slug]).join(", ")}</Text>
+              <Text style={s.unknownNote}>{t("detail.a11yCallAhead")}</Text>
             </View>
           ) : null}
         </Section>
 
         {activity.tags.length > 0 ? (
-          <Section p={p} title={lang === "fr" ? "Étiquettes" : "Tags"}>
+          <Section p={p} title={t("detail.tags")}>
             <View style={s.tagWrap}>
               {activity.tags.map((slug) => (
-                <View key={slug} style={s.tag}>
-                  <Text style={s.tagText}>{catalog.tagLabels[slug] ?? slug}</Text>
-                </View>
+                <View key={slug} style={s.tag}><Text style={s.tagText}>{catalog.tagLabels[slug] ?? slug}</Text></View>
               ))}
             </View>
           </Section>
         ) : null}
 
         {venue ? (
-          <Section p={p} title={lang === "fr" ? "Où" : "Where"}>
+          <Section p={p} title={t("detail.where")}>
             <Text style={s.body}>{venue.name}</Text>
             {venue.address ? <Text style={s.muted}>{venue.address}</Text> : null}
             {venue.neighbourhood ? <Text style={s.muted}>{venue.neighbourhood}</Text> : null}
           </Section>
         ) : null}
 
-        {activity.verifiedAt ? (
-          <Text style={s.verified}>
-            {lang === "fr" ? "Vérifié le " : "Verified "}
-            {new Date(activity.verifiedAt).toLocaleDateString(lang === "fr" ? "fr-CA" : "en-CA")}
-          </Text>
-        ) : (
-          <Text style={s.verified}>{t("unverified", lang)}</Text>
-        )}
+        <Text style={s.verified}>
+          {activity.verifiedAt ? t("detail.verified", { date: formatDate(activity.verifiedAt, lang) }) : t("detail.unverified")}
+        </Text>
       </ScrollView>
 
       <View style={s.actions}>
-        <Pressable
-          style={[s.action, s.secondary]} onPress={() => toggleSave(activity.id)}
-          accessibilityRole="button" accessibilityState={{ selected: isSaved }}
-        >
-          <Text style={s.secondaryText}>
-            {isSaved ? (lang === "fr" ? "★ Enregistré" : "★ Saved")
-                     : (lang === "fr" ? "☆ Enregistrer" : "☆ Save")}
-          </Text>
+        <Pressable style={[s.action, s.secondary]} onPress={() => toggleSave(activity.id)}
+          accessibilityRole="button" accessibilityState={{ selected: saved }}>
+          <Text style={s.secondaryText}>{saved ? t("detail.saved") : t("detail.save")}</Text>
         </Pressable>
         <Pressable style={[s.action, s.primary]} onPress={openMaps} accessibilityRole="button">
-          <Text style={s.primaryText}>{lang === "fr" ? "Y aller" : "Directions"}</Text>
+          <Text style={s.primaryText}>{t("detail.go")}</Text>
         </Pressable>
       </View>
+
+      <ListSheet activityId={activity.id} visible={listOpen} onClose={() => setListOpen(false)} />
+      <ReportSheet activityId={activity.id} visible={reportOpen} onClose={() => setReportOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -177,11 +168,15 @@ function Section({ p, title, children }: { p: Palette; title: string; children: 
 
 function Fact({ p, label, value }: { p: Palette; label: string; value: string }) {
   const s = styles(p);
+  return <View style={s.fact}><Text style={s.factLabel}>{label}</Text><Text style={s.factValue}>{value}</Text></View>;
+}
+
+function Quick({ p, label, onPress }: { p: Palette; label: string; onPress: () => void }) {
+  const s = styles(p);
   return (
-    <View style={s.fact}>
-      <Text style={s.factLabel}>{label}</Text>
-      <Text style={s.factValue}>{value}</Text>
-    </View>
+    <Pressable style={s.quickBtn} onPress={onPress} accessibilityRole="button">
+      <Text style={s.quickText}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -199,11 +194,17 @@ const styles = (p: Palette) => StyleSheet.create({
   fact: { flexGrow: 1, flexBasis: "25%", padding: space.md, gap: 2 },
   factLabel: { ...typography.micro, color: p.ink4, textTransform: "uppercase" },
   factValue: { ...typography.body, color: p.ink, fontWeight: "600" },
+  quick: { flexDirection: "row", gap: space.sm, flexWrap: "wrap" },
+  quickBtn: {
+    paddingHorizontal: space.md, paddingVertical: 8, borderRadius: radius.pill, minHeight: 36,
+    backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule, justifyContent: "center",
+  },
+  quickText: { ...typography.small, color: p.ink2, fontWeight: "500" },
   section: { gap: space.xs },
   sectionTitle: { ...typography.heading, color: p.ink },
   body: { ...typography.body, color: p.ink2, lineHeight: 22 },
   muted: { ...typography.small, color: p.ink3 },
-  mono: { ...typography.small, color: p.ink3, fontFamily: "monospace" },
+  mono: { ...typography.small, color: p.ink3, fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }) },
   open: { color: p.accent, fontWeight: "600" },
   closed: { color: p.ink3 },
   a11yRow: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: 3 },
@@ -214,10 +215,7 @@ const styles = (p: Palette) => StyleSheet.create({
   unknownLabel: { ...typography.micro, color: p.warm, textTransform: "uppercase" },
   unknownNote: { ...typography.small, color: p.ink3, marginTop: 4 },
   tagWrap: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
-  tag: {
-    paddingHorizontal: space.md, paddingVertical: 6, borderRadius: radius.pill,
-    backgroundColor: p.surfaceAlt,
-  },
+  tag: { paddingHorizontal: space.md, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: p.surfaceAlt },
   tagText: { ...typography.small, color: p.ink2 },
   verified: { ...typography.micro, color: p.ink4, textAlign: "center", marginTop: space.md },
   actions: {

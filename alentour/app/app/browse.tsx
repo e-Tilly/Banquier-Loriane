@@ -1,6 +1,6 @@
 /** Filtered list. The "never show zero" promise lives here. */
 import React, { useMemo, useState } from "react";
-import { View, Text, FlatList, TextInput, Pressable, StyleSheet } from "react-native";
+import { View, Text, FlatList, TextInput, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { applyFilters, diversify } from "@core/catalog/filter.ts";
 import { useStore } from "../lib/store.tsx";
@@ -8,24 +8,12 @@ import { usePalette, space, radius, typography, type Palette } from "../lib/them
 import { ActivityCard } from "../components/ActivityCard.tsx";
 import { FilterBar } from "../components/FilterBar.tsx";
 import { FilterSheet } from "../components/FilterSheet.tsx";
-
-const FILTER_LABELS: Record<string, { fr: string; en: string }> = {
-  maxDistanceKm: { fr: "la distance", en: "distance" },
-  maxPriceCents: { fr: "le prix", en: "price" },
-  categories: { fr: "la catégorie", en: "category" },
-  tags: { fr: "l'ambiance", en: "vibe" },
-  openNow: { fr: "ouvert maintenant", en: "open now" },
-  maxDurationMinutes: { fr: "la durée", en: "duration" },
-  maxPhysical: { fr: "l'effort", en: "effort" },
-  maxSkill: { fr: "le niveau", en: "skill" },
-  indoorOnly: { fr: "intérieur", en: "indoor" },
-  minIcebreaker: { fr: "le côté social", en: "sociability" },
-};
+import type { Key } from "../lib/i18n.ts";
 
 export default function Browse() {
   const p = usePalette();
   const s = styles(p);
-  const { catalog, lang, filters, setFilters, rankContext, saved, toggleSave } = useStore();
+  const { catalog, lang, t, filters, setFilters, rankContext, isSaved, toggleSave } = useStore();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -38,25 +26,18 @@ export default function Browse() {
 
   const primary = diversify(outcome.matches);
   const showing = primary.length > 0 ? primary : (outcome.relaxed?.matches ?? []);
-
-  const droppedText = outcome.relaxed
-    ? outcome.relaxed.droppedFilters
-        .map((k) => FILTER_LABELS[k]?.[lang] ?? String(k))
-        .join(lang === "fr" ? " et " : " and ")
-    : null;
+  const droppedText = outcome.relaxed?.droppedFilters
+    .map((k) => t(`filter.${String(k)}` as Key))
+    .join(t("browse.and"));
 
   return (
     <SafeAreaView style={s.screen} edges={["bottom"]}>
       <View style={s.searchRow}>
         <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder={lang === "fr" ? "Chercher…" : "Search…"}
-          placeholderTextColor={p.ink4}
-          style={s.input}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-          accessibilityLabel={lang === "fr" ? "Chercher une activité" : "Search activities"}
+          value={query} onChangeText={setQuery}
+          placeholder={t("browse.search")} placeholderTextColor={p.ink4}
+          style={s.input} returnKeyType="search" clearButtonMode="while-editing"
+          accessibilityLabel={t("browse.search")}
         />
       </View>
 
@@ -69,45 +50,33 @@ export default function Browse() {
         ListHeaderComponent={
           <View style={s.resultHeader}>
             {primary.length > 0 ? (
-              <Text style={s.count}>
-                {primary.length} {lang === "fr" ? "résultats" : "results"}
-              </Text>
+              <Text style={s.count}>{t("browse.results", { n: primary.length })}</Text>
             ) : outcome.relaxed ? (
-              // Never a dead end: say exactly what was ignored, and offer to put it back.
+              // Never a dead end: say exactly what was ignored.
               <View style={s.relaxed}>
-                <Text style={s.relaxedTitle}>
-                  {lang === "fr" ? "Aucun résultat exact" : "No exact matches"}
-                </Text>
+                <Text style={s.relaxedTitle}>{t("browse.noExact")}</Text>
                 <Text style={s.relaxedBody}>
-                  {lang === "fr"
-                    ? `Voici ${outcome.relaxed.matches.length} suggestions en ignorant ${droppedText}.`
-                    : `Showing ${outcome.relaxed.matches.length} results ignoring ${droppedText}.`}
+                  {t("browse.relaxed", { n: outcome.relaxed.matches.length, what: droppedText ?? "" })}
                 </Text>
               </View>
             ) : (
-              <Text style={s.count}>{lang === "fr" ? "Rien à afficher" : "Nothing to show"}</Text>
+              <Text style={s.count}>{t("browse.nothing")}</Text>
             )}
           </View>
         }
         renderItem={({ item }) => (
           <View style={s.cardWrap}>
-            <ActivityCard item={item} lang={lang} saved={saved.has(item.activity.id)} onToggleSave={toggleSave} />
+            <ActivityCard item={item} lang={lang} saved={isSaved(item.activity.id)} onToggleSave={toggleSave} />
           </View>
         )}
         ListFooterComponent={
           outcome.unknownA11y.length > 0 ? (
             <View style={s.unknownSection}>
-              <Text style={s.unknownTitle}>
-                {lang === "fr" ? "Accessibilité non vérifiée" : "Accessibility not verified"}
-              </Text>
-              <Text style={s.unknownBody}>
-                {lang === "fr"
-                  ? "On ne sait pas encore. Ces lieux ne sont pas cachés pour autant."
-                  : "We don't know yet. These aren't hidden for that reason."}
-              </Text>
+              <Text style={s.unknownTitle}>{t("browse.unknownTitle")}</Text>
+              <Text style={s.unknownBody}>{t("browse.unknownBody")}</Text>
               {outcome.unknownA11y.slice(0, 10).map((item) => (
                 <View key={item.activity.id} style={s.cardWrap}>
-                  <ActivityCard item={item} lang={lang} saved={saved.has(item.activity.id)} onToggleSave={toggleSave} />
+                  <ActivityCard item={item} lang={lang} saved={isSaved(item.activity.id)} onToggleSave={toggleSave} />
                 </View>
               ))}
             </View>
@@ -115,11 +84,8 @@ export default function Browse() {
         }
       />
 
-      <FilterSheet
-        visible={sheetOpen} onClose={() => setSheetOpen(false)}
-        catalog={catalog} filters={filters} onChange={setFilters}
-        ctx={rankContext} lang={lang}
-      />
+      <FilterSheet visible={sheetOpen} onClose={() => setSheetOpen(false)}
+        catalog={catalog} filters={filters} onChange={setFilters} ctx={rankContext} lang={lang} />
     </SafeAreaView>
   );
 }
