@@ -5,6 +5,7 @@ import type { Mailer } from "./mailer.ts";
 import type { EnrichDeps } from "../enrichment/pipeline.ts";
 import type { Sms } from "../outings/phone.ts";
 import type { Pusher } from "../outings/notify.ts";
+import type { StripeConfig } from "../billing/stripe.ts";
 
 /** Everything the API needs from the outside world, injected so tests can control it. */
 export interface Deps {
@@ -20,6 +21,10 @@ export interface Deps {
   sms?: Sms;
   pusher?: Pusher;
   operatorEmail?: string | null;
+  /** Stage 6: Business Pro billing. Absent: the billing page says Pro isn't available yet. */
+  stripe?: StripeConfig | null;
+  /** Outbound HTTP for Stripe calls; tests replace it. */
+  fetch?: typeof fetch;
 }
 
 export interface SessionUser {

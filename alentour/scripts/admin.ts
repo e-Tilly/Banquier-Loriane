@@ -20,11 +20,13 @@
  *   npm run admin -- pause-outings on|off       the whole feature (joins, votes, new outings)
  *   npm run admin -- pause-creation on|off      only new outings — flip this before going away
  *   npm run admin -- restrict <user-id> <days>  keep someone out of outings for a while
+ *   npm run admin -- reject-submission <activity-id> "why"   a community submission that won't be published
  */
 import pg from "pg";
 import { approveClaim, rejectClaim } from "../src/claims/claims.ts";
 import { staleListings } from "../src/freshness/nudge.ts";
 import { setSettings } from "../src/outings/core.ts";
+import { recomputeTrust, rejectSubmission } from "../src/community/submissions.ts";
 
 const REVIEWER = `admin:${process.env.USER ?? "cli"}`;
 
@@ -128,8 +130,14 @@ export async function run(pool: pg.Pool, argv: string[], out: (s: string) => voi
     case "publish": {
       if (!args[0]) { out("usage: publish <venue-id>"); return 2; }
       const r = await pool.query(
-        `UPDATE activities SET status = 'published', updated_at = now()
-          WHERE status = 'pending_review' AND id IN (SELECT activity_id FROM activity_locations WHERE venue_id = $1)`, [args[0]]);
+        `UPDATE activities SET status = 'published', updated_at = now(), last_verified_at = COALESCE(last_verified_at, now())
+          WHERE status = 'pending_review' AND id IN (SELECT activity_id FROM activity_locations WHERE venue_id = $1)
+          RETURNING created_by`, [args[0]]);
+      for (const by of new Set(r.rows.map((x) => x.created_by).filter(Boolean))) {
+        await recomputeTrust(pool, by);
+        await pool.query(
+          `INSERT INTO notifications (user_id, kind, title, body) VALUES ($1, 'submission', 'Publié / Published', 'Merci ! Ton ajout est maintenant dans Alentour. / Thanks! Your addition is now on Alentour.')`, [by]);
+      }
       await pool.query(
         `UPDATE providers SET claim_status = 'verified', claimed_at = COALESCE(claimed_at, now())
           WHERE claim_status = 'pending' AND id = (SELECT provider_id FROM venues WHERE id = $1)`, [args[0]]);
@@ -217,6 +225,15 @@ export async function run(pool: pg.Pool, argv: string[], out: (s: string) => voi
       out(`✓ ${JSON.stringify(s)}`);
       return 0;
     }
+    case "reject-submission": {
+      if (!args[0] || !args[1]) { out('usage: reject-submission <activity-id> "why"'); return 2; }
+      const by = await rejectSubmission(pool, args[0], args[1]);
+      if (!by) { out("not found or not a pending community submission"); return 1; }
+      await pool.query(
+        `INSERT INTO notifications (user_id, kind, title, body) VALUES ($1, 'submission', 'Non publié / Not published', $2)`, [by, args[1]]);
+      out("✓ rejected — the person is told why");
+      return 0;
+    }
     case "restrict": {
       const days = Number(args[1]);
       if (!args[0] || !Number.isFinite(days)) { out("usage: restrict <user-id> <days>"); return 2; }
@@ -227,7 +244,8 @@ export async function run(pool: pg.Pool, argv: string[], out: (s: string) => voi
     default:
       out("commands: stats | claims | approve <id> | reject <id> \"why\" | reports | resolve <id> actioned|dismissed \"note\"" +
         " | pending | publish <venue-id> | hide <activity-id> | media | media-ok <id> | media-no <id> | jobs | stale" +
-        " | outings | unpause <id> | cancel <id> | pause-outings on|off | pause-creation on|off | restrict <user-id> <days>");
+        " | outings | unpause <id> | cancel <id> | pause-outings on|off | pause-creation on|off | restrict <user-id> <days>" +
+        " | reject-submission <activity-id> \"why\"");
       return cmd ? 2 : 0;
   }
 }

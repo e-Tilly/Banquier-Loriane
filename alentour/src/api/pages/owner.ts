@@ -25,6 +25,9 @@ import { findDuplicateVenues, type DuplicateVenue } from "../../enrichment/geo.t
 import { createJob, jobAllowance } from "../../enrichment/pipeline.ts";
 import { deletePhoto, publishOnboarding, storePhotos, type Review } from "../../enrichment/listing.ts";
 import type { Draft, DraftActivity } from "../../enrichment/types.ts";
+import { createCheckout, createPortal, entitlementsFor, providerEntitlements } from "../../billing/stripe.ts";
+import { createVenueSession } from "../../outings/outings.ts";
+import { fromLocal } from "../../outings/time.ts";
 
 const COOKIE = "alentour_owner";
 type L = "fr" | "en";
@@ -107,7 +110,7 @@ const T = {
   photoRules: { fr: "JPEG, PNG ou WebP, 8 Mo max, 8 photos max. On retire la localisation GPS des photos. Les photos où l'on voit des gens sont vérifiées avant d'être publiées.", en: "JPEG, PNG or WebP, 8 MB max, 8 photos max. We remove GPS location from photos. Photos showing people are checked before they go live." },
   err_too_large: { fr: "fichier trop lourd (8 Mo max)", en: "file too large (8 MB max)" },
   err_unsupported_format: { fr: "format non pris en charge (JPEG, PNG, WebP)", en: "unsupported format (JPEG, PNG, WebP)" },
-  err_too_many: { fr: "8 photos maximum", en: "8 photos maximum" },
+  err_too_many: { fr: "limite de photos atteinte (6 en gratuit, 30 avec Pro)", en: "photo limit reached (6 free, 30 with Pro)" },
   awaitingReview: { fr: "en attente de vérification", en: "awaiting review" },
   addBusiness: { fr: "Ajouter mon entreprise", en: "Add my business" },
   newTitle: { fr: "Ajouter votre entreprise", en: "Add your business" },
@@ -158,6 +161,30 @@ const T = {
   publishedNow: { fr: "Publié ! Votre fiche sera dans l'app à la prochaine mise à jour du catalogue.", en: "Published! Your listing will be in the app with the next catalog update." },
   publishedPending: { fr: "Merci ! On vérifie que l'entreprise est bien à vous, puis on publie. Pour une vérification immédiate, connectez-vous avec une adresse au domaine de votre site.", en: "Thanks! We'll check the business is yours, then publish. To verify instantly, sign in with an address at your website's domain." },
   location: { fr: "Emplacement", en: "Location" },
+  billing: { fr: "Abonnement", en: "Subscription" },
+  stats: { fr: "Statistiques", en: "Statistics" },
+  tierFree: { fr: "Gratuit", en: "Free" },
+  tierPro: { fr: "Pro", en: "Pro" },
+  proPitch: { fr: "Pro : photos illimitées, vos propres séances publiées dans l'app, un bouton « Réserver », et les statistiques complètes. 29 $/mois ou 290 $/an, taxes en sus, annulable en tout temps.", en: "Pro: unlimited photos, your own sessions published in the app, a Book button, and full statistics. $29/month or $290/year plus tax, cancel any time." },
+  upgradeMonthly: { fr: "Passer à Pro — 29 $/mois", en: "Go Pro — $29/month" },
+  upgradeYearly: { fr: "290 $/an (2 mois gratuits)", en: "$290/year (2 months free)" },
+  manage: { fr: "Gérer l'abonnement et les factures", en: "Manage subscription and invoices" },
+  billingDone: { fr: "Merci ! Votre abonnement sera actif dans quelques secondes.", en: "Thanks! Your subscription will be active in a few seconds." },
+  billingOff: { fr: "L'abonnement Pro n'est pas encore offert.", en: "Pro isn't available yet." },
+  proUntil: { fr: "Actif jusqu'au", en: "Active until" },
+  proOnly: { fr: "Réservé à Pro", en: "Pro only" },
+  bookingUrl: { fr: "Lien de réservation (https://…)", en: "Booking link (https://…)" },
+  sessions: { fr: "Vos séances dans l'app", en: "Your sessions in the app" },
+  sessionsHint: { fr: "Publiez une séance (soirée débutants, atelier…) : les gens d'Alentour peuvent s'y joindre en petit groupe, 8 max.", en: "Publish a session (beginner night, workshop…): Alentour users can join as a small group, 8 max." },
+  sessionWhen: { fr: "Date et heure (heure de Montréal)", en: "Date and time (Montréal time)" },
+  sessionCap: { fr: "Places pour les gens d'Alentour", en: "Spots for Alentour users" },
+  addSession: { fr: "Publier la séance", en: "Publish session" },
+  noSessions: { fr: "Aucune séance à venir.", en: "No upcoming sessions." },
+  going: { fr: "inscrits", en: "going" },
+  savesLabel: { fr: "enregistrements (30 jours)", en: "saves (30 days)" },
+  joinsLabel: { fr: "personnes venues en sortie (30 jours)", en: "people who came on an outing (30 days)" },
+  weekly: { fr: "Enregistrements par semaine", en: "Saves per week" },
+  statsUpsell: { fr: "Le détail par semaine fait partie de Pro.", en: "The weekly breakdown is part of Pro." },
 } as const;
 
 const EDITABLE_FACETS = ["vibe", "audience", "logistics", "group", "booking", "weather"];
@@ -238,6 +265,7 @@ export function ownerPages(d: Deps) {
             <span class="muted"> · ${x.venue_name} · ${tr("lastVerified")} ${x.last_verified_at ? fmtDate(x.last_verified_at, l) : tr("never")}</span></li>`)}
         </ul>` : html`<p class="muted">${tr("noListings")}</p>`}
         <p class="inline"><a class="button" href="/owner/new">${tr("addBusiness")}</a> <a class="button secondary" href="/owner/claim">${tr("claim")}</a></p>
+        ${listings.length ? html`<p class="inline"><a href="/owner/stats">${tr("stats")} →</a> <a href="/owner/billing">${tr("billing")} →</a></p>` : ""}
       </section>
       ${claims.rows.length ? html`<section class="card"><h2>${tr("claims")}</h2><ul class="list">
         ${claims.rows.map((c: any) => html`<li>${c.name} — ${tr(`status_${c.status}` as keyof typeof T)}</li>`)}
@@ -348,6 +376,7 @@ export function ownerPages(d: Deps) {
     if (!u) return c.redirect("/owner");
     const x = (await ownerListings(d.pool, u.id)).find((r: any) => r.id === c.req.param("id"));
     if (!x) return c.text("Not found", 404);
+    x.sessions = await upcomingSessions(x.id);
     return c.html(editPage(l, x, csrfFor(u), c.req.query("saved") === "1" ? "saved" : null, [], mediaUrl));
   });
 
@@ -382,7 +411,8 @@ export function ownerPages(d: Deps) {
     if (!current || !d.enrich) return c.text("Not found", 404);
     const b = await c.req.parseBody({ all: true });
     if (b.licence !== "on") return c.html(editPage(l, current, csrfFor(u), null, [T.licenceRequired[l]], mediaUrl), 400);
-    const results = await storePhotos(d.pool, d.enrich, { type: "activity", id }, u.id, await filesOf(b.photos), now());
+    const limit = (await providerEntitlements(d.pool, current.provider_id)).maxPhotos;
+    const results = await storePhotos(d.pool, d.enrich, { type: "activity", id }, u.id, await filesOf(b.photos), now(), limit);
     const failed = results.filter((r) => r.safety === "error").map((r) => `${r.name}: ${T[`err_${r.error}` as keyof typeof T]?.[l] ?? r.error}`);
     if (failed.length) {
       const fresh = (await ownerListings(d.pool, u.id)).find((r: any) => r.id === id);
@@ -508,6 +538,119 @@ export function ownerPages(d: Deps) {
     return c.redirect("/owner");
   });
 
+  // ---------------------------------------------------------------- Business Pro
+  const upcomingSessions = async (activityId: string) => (await d.pool.query(
+    `SELECT o.id, o.starts_at, o.capacity_max,
+            (SELECT count(*)::int FROM outing_participants p WHERE p.outing_id = o.id AND p.status = 'going') AS going
+       FROM outings o WHERE o.activity_id = $1 AND o.mode = 'venue_session' AND o.organizer = 'venue'
+        AND o.host_provider_id IS NOT NULL AND o.status = 'confirmed' AND o.starts_at > $2 ORDER BY o.starts_at LIMIT 20`,
+    [activityId, now()])).rows;
+
+  app.post("/activities/:id/sessions", async (c) => {
+    const l = lang(c);
+    const u = await owner(c);
+    if (!u) return c.redirect("/owner");
+    const id = c.req.param("id");
+    const x = (await ownerListings(d.pool, u.id)).find((r: any) => r.id === id);
+    if (!x) return c.text("Not found", 404);
+    x.sessions = await upcomingSessions(id);
+    if (!(await providerEntitlements(d.pool, x.provider_id)).hostSessions) {
+      return c.html(editPage(l, x, csrfFor(u), null, [T.proOnly[l]], mediaUrl), 402);
+    }
+    const b = await c.req.parseBody();
+    const m = String(b.startsAt ?? "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+    if (!m) return c.html(editPage(l, x, csrfFor(u), null, [T.sessionWhen[l]], mediaUrl), 400);
+    const startsAt = fromLocal(+m[1]!, +m[2]!, +m[3]!, +m[4]!, +m[5]!, "America/Toronto");
+    const r = await createVenueSession(d.pool, x.provider_id, id, startsAt, Number(b.capacity ?? 8), now());
+    if (!r.ok) return c.html(editPage(l, x, csrfFor(u), null, ["detail" in r && r.detail ? r.detail : r.error], mediaUrl), 400);
+    return c.redirect(`/owner/activities/${id}?saved=1`);
+  });
+
+  const myProviders = async (userId: string) => (await d.pool.query(
+    `SELECT p.* FROM providers p JOIN provider_members m ON m.provider_id = p.id AND m.user_id = $1
+      WHERE m.role IN ('owner', 'manager') ORDER BY p.display_name`, [userId])).rows;
+
+  app.get("/billing", async (c) => {
+    const l = lang(c), tr = t(l);
+    const u = await owner(c);
+    if (!u) return c.redirect("/owner");
+    const providers = await myProviders(u.id);
+    const csrf = csrfFor(u);
+    return c.html(page(l, tr("billing"), html`
+      ${c.req.query("done") ? html`<p class="card ok">${tr("billingDone")}</p>` : ""}
+      <p class="muted">${tr("proPitch")}</p>
+      ${providers.map((p: any) => html`<section class="card">
+        <h2>${p.display_name} <span class="badge">${p.subscription_tier === "pro" ? tr("tierPro") : tr("tierFree")}</span></h2>
+        ${p.subscription_tier === "pro" && p.pro_until ? html`<p class="muted">${tr("proUntil")} ${fmtDate(p.pro_until, l)}</p>` : ""}
+        ${!d.stripe ? html`<p class="muted">${tr("billingOff")}</p>` : p.subscription_tier !== "pro" ? html`
+          <form method="post" action="/owner/billing/checkout" class="inline">
+            <input type="hidden" name="_csrf" value="${csrf}"><input type="hidden" name="provider" value="${p.id}">
+            <button name="plan" value="monthly">${tr("upgradeMonthly")}</button>
+            <button name="plan" value="yearly" class="secondary">${tr("upgradeYearly")}</button>
+          </form>` : ""}
+        ${d.stripe && p.stripe_customer_id ? html`
+          <form method="post" action="/owner/billing/portal"><input type="hidden" name="_csrf" value="${csrf}">
+            <input type="hidden" name="provider" value="${p.id}"><button class="secondary">${tr("manage")}</button></form>` : ""}
+      </section>`)}
+      <p><a href="/owner">${tr("back")}</a></p>`));
+  });
+
+  app.post("/billing/checkout", async (c) => {
+    const u = await owner(c);
+    if (!u || !d.stripe) return c.redirect("/owner/billing");
+    const b = await c.req.parseBody();
+    const p = (await myProviders(u.id)).find((x: any) => x.id === b.provider);
+    if (!p) return c.text("Not found", 404);
+    const url = await createCheckout(d.stripe, { id: p.id, stripeCustomerId: p.stripe_customer_id }, u.email,
+      b.plan === "yearly" ? "yearly" : "monthly", d.fetch ?? fetch);
+    return c.redirect(url, 303);
+  });
+
+  app.post("/billing/portal", async (c) => {
+    const u = await owner(c);
+    if (!u || !d.stripe) return c.redirect("/owner/billing");
+    const b = await c.req.parseBody();
+    const p = (await myProviders(u.id)).find((x: any) => x.id === b.provider);
+    if (!p?.stripe_customer_id) return c.text("Not found", 404);
+    return c.redirect(await createPortal(d.stripe, p.stripe_customer_id, d.fetch ?? fetch), 303);
+  });
+
+  /** The attribution numbers Pro sells on: people who saved you, people who came. */
+  app.get("/stats", async (c) => {
+    const l = lang(c), tr = t(l);
+    const u = await owner(c);
+    if (!u) return c.redirect("/owner");
+    const since = new Date(now().getTime() - 30 * 86_400_000);
+    const { rows } = await d.pool.query(
+      `SELECT a.id, pr.subscription_tier AS tier,
+              COALESCE((SELECT title FROM activity_content c WHERE c.activity_id = a.id AND c.locale = $3),
+                       (SELECT title FROM activity_content c WHERE c.activity_id = a.id AND c.locale = 'fr-CA')) AS title,
+              (SELECT count(*)::int FROM saves s WHERE s.activity_id = a.id AND s.created_at > $2) AS saves,
+              (SELECT count(*)::int FROM outing_participants p JOIN outings o ON o.id = p.outing_id
+                WHERE o.activity_id = a.id AND p.status = 'going' AND o.starts_at > $2 AND o.starts_at < $4) AS joins,
+              (SELECT array_agg(n ORDER BY w) FROM (
+                 SELECT gs.w, (SELECT count(*)::int FROM saves s WHERE s.activity_id = a.id
+                                 AND s.created_at >= $4::timestamptz - (gs.w + 1) * interval '7 days'
+                                 AND s.created_at <  $4::timestamptz - gs.w * interval '7 days') AS n
+                   FROM generate_series(0, 7) AS gs(w)) x) AS weekly
+         FROM activities a JOIN provider_members m ON m.provider_id = a.provider_id AND m.user_id = $1
+         JOIN providers pr ON pr.id = a.provider_id
+        ORDER BY saves DESC`, [u.id, since, l === "fr" ? "fr-CA" : "en-CA", now()]);
+    return c.html(page(l, tr("stats"), html`
+      ${rows.map((r: any) => {
+        const e = entitlementsFor(r.tier);
+        const weeks = [...(r.weekly ?? [])].reverse();
+        const max = Math.max(1, ...weeks);
+        return html`<section class="card"><h2>${r.title}</h2>
+          <p><strong>${r.saves}</strong> ${tr("savesLabel")} · <strong>${r.joins}</strong> ${tr("joinsLabel")}</p>
+          ${e.fullStats ? html`<p class="muted">${tr("weekly")}</p><div class="bars">${weeks.map((n: number) =>
+            html`<span title="${n}" style="height:${Math.round((n / max) * 60) + 2}px"></span>`)}</div>`
+            : html`<p class="muted">${tr("statsUpsell")} <a href="/owner/billing">${tr("billing")} →</a></p>`}
+        </section>`;
+      })}
+      <p><a href="/owner">${tr("back")}</a></p>`));
+  });
+
   return app;
 }
 
@@ -566,6 +709,8 @@ function listingFields(l: L, x: any, prefix = "", hints: Hints = {}) {
           </select></label>
         </div>
         ${hintLine(l, hints.minAge)}
+        ${x.tier === "pro" ? html`<label>${tr("bookingUrl")}<input name="${n("bookingUrl")}" type="url" value="${x.booking_url ?? ""}" placeholder="https://" maxlength="300"></label>`
+          : x.tier ? html`<p class="muted small">${tr("bookingUrl")} — ${tr("proOnly")} · <a href="/owner/billing">${tr("billing")} →</a></p>` : ""}
       </fieldset>
       <fieldset class="card"><legend>${tr("a11y")}</legend>
         <p class="muted">${tr("a11yHint")}</p>
@@ -607,6 +752,23 @@ function photoSection(l: L, x: any, csrf: string, mediaUrl: (key: string) => str
     </section>`;
 }
 
+function sessionSection(l: L, x: any, csrf: string) {
+  const tr = (k: keyof typeof T) => T[k][l];
+  const sessions: any[] = x.sessions ?? [];
+  return html`<section class="card"><h2>${tr("sessions")}</h2>
+    <p class="muted small">${tr("sessionsHint")}</p>
+    ${sessions.length ? html`<ul class="list">${sessions.map((o) => html`<li>${new Date(o.starts_at).toLocaleString(l === "fr" ? "fr-CA" : "en-CA",
+      { timeZone: "America/Toronto", weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} — ${o.going}/${o.capacity_max} ${tr("going")}</li>`)}</ul>`
+      : html`<p class="muted">${tr("noSessions")}</p>`}
+    ${x.tier === "pro" ? html`<form method="post" action="/owner/activities/${x.id}/sessions" class="row">
+        <input type="hidden" name="_csrf" value="${csrf}">
+        <label>${tr("sessionWhen")}<input type="datetime-local" name="startsAt" required></label>
+        <label>${tr("sessionCap")}<input type="number" name="capacity" min="3" max="8" value="8"></label>
+        <button>${tr("addSession")}</button></form>`
+      : html`<p class="muted small">${tr("proOnly")} · <a href="/owner/billing">${tr("billing")} →</a></p>`}
+  </section>`;
+}
+
 function editPage(l: L, x: any, csrf: string, notice: "saved" | null, errors: string[], mediaUrl: (key: string) => string) {
   const tr = (k: keyof typeof T) => T[k][l];
   const content = (loc: string) => x.content?.[loc] ?? {};
@@ -621,6 +783,7 @@ function editPage(l: L, x: any, csrf: string, notice: "saved" | null, errors: st
       <span class="muted">${tr("lastVerified")} : ${x.last_verified_at ? fmtDate(x.last_verified_at, l) : tr("never")}</span>
     </form>
     ${photoSection(l, x, csrf, mediaUrl)}
+    ${sessionSection(l, x, csrf)}
     <form method="post" action="/owner/activities/${x.id}">
       <input type="hidden" name="_csrf" value="${csrf}">
       ${listingFields(l, x)}
@@ -667,6 +830,7 @@ export function formToPatch(b: Record<string, unknown>, current: any, prefix = "
     openingHours: str("openingHours") || null,
     minAge: minAge ? Number(minAge) : null,
     weather: (["indoor", "covered", "outdoor", "either"].includes(weather) ? weather : null) as OwnerPatch["weather"],
+    ...(typeof b[`${prefix}bookingUrl`] === "string" ? { bookingUrl: str("bookingUrl") || null } : {}),
     ...(Object.keys(a11y).length ? { a11y } : {}),
     tagsAdd: [...wanted].filter((s) => !had.has(s) && editable.has(s)),
     tagsRemove: [...had].filter((s) => !wanted.has(s) && editable.has(s)),
@@ -878,6 +1042,7 @@ button.link{background:none;color:var(--ink3);padding:.2rem 0;font-weight:400;te
 .photos{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:.75rem}.photos figure{margin:0;width:140px}
 .photos img,.ph-none{width:140px;height:105px;object-fit:cover;border-radius:8px;background:var(--rule);display:block}
 .photos figcaption{font-size:.8rem;color:var(--ink3)}
+.bars{display:flex;align-items:flex-end;gap:6px;height:64px}.bars span{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-width:8px}
 .activity{border-top:2px solid var(--rule);padding-top:1rem;margin-top:1rem}
 .steps li{margin:.4rem 0;color:var(--ink3)}.steps li.done{color:var(--accent)}.steps li.done::after{content:" ✓"}.steps li.now{color:var(--ink);font-weight:600}.steps li.now::after{content:" …"}.error{color:var(--danger)}.ok{border-color:var(--accent);color:var(--accent);font-weight:600}
 `;

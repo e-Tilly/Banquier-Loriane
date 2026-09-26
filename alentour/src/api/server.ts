@@ -17,6 +17,7 @@ import { startWorker, type EnrichDeps } from "../enrichment/pipeline.ts";
 import { smsFromEnv } from "../outings/phone.ts";
 import { ExpoPusher } from "../outings/notify.ts";
 import { startOutingsClock } from "../outings/lifecycle.ts";
+import { stripeFromEnv } from "../billing/stripe.ts";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
 
@@ -40,7 +41,7 @@ const operatorEmail = process.env.OPERATOR_EMAIL ?? null;
 const clock = startOutingsClock(pool, { client: enrich.client, pusher, mailer, operatorEmail });
 
 const app = createApp(
-  { pool, mailer, config: configFromEnv(), enrich, sms: smsFromEnv(), pusher, operatorEmail },
+  { pool, mailer, config: configFromEnv(), enrich, sms: smsFromEnv(), pusher, operatorEmail, stripe: stripeFromEnv() },
   { trustProxy: process.env.TRUST_PROXY === "1" },
 );
 const port = Number(process.env.PORT ?? 8787);

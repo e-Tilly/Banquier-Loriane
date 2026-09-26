@@ -357,3 +357,24 @@ export function chatOpen(o: { status: string; starts_at: Date | null; purged_at?
   if (o.status !== "confirmed" || !o.starts_at || o.purged_at) return false;
   return now.getTime() < new Date(o.starts_at).getTime() + 48 * 3_600_000;
 }
+
+/**
+ * Business Pro: a venue publishes its own session ("Tuesday beginner night") so Alentour users
+ * can join as a group — the thing the outreach agent suggests businesses do.
+ */
+export async function createVenueSession(
+  pool: pg.Pool, providerId: string, activityId: string, startsAt: Date, capacity: number, now: Date,
+): Promise<{ ok: true; outingId: string } | Fail> {
+  const a = await activityFacts(pool, activityId);
+  if (!a || a.provider_id !== providerId || a.status !== "published") return { ok: false, error: "not_found" };
+  const lead = startsAt.getTime() - now.getTime();
+  if (lead < 2 * 3_600_000 || lead > 60 * 86_400_000) return { ok: false, error: "invalid", detail: "2 hours to 60 days ahead" };
+  const cap = Math.max(QUORUM, Math.min(MAX_GROUP, Math.round(capacity)));
+  const { rows } = await pool.query<{ id: string }>(
+    `INSERT INTO outings (activity_id, venue_id, host_provider_id, mode, organizer, status, starts_at, ends_at, capacity_min, capacity_max, created_at, updated_at)
+     VALUES ($1, $2, $3, 'venue_session', 'venue', 'confirmed', $4, $5, 2, $6, $7, $7)
+     ON CONFLICT (activity_id, starts_at) WHERE mode = 'venue_session' DO NOTHING RETURNING id`,
+    [a.id, a.venue_id, providerId, startsAt, new Date(startsAt.getTime() + (a.typical_duration_minutes ?? 120) * 60_000), cap, now]);
+  if (!rows[0]) return { ok: false, error: "invalid", detail: "a session already starts then" };
+  return { ok: true, outingId: rows[0].id };
+}

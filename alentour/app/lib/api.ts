@@ -24,10 +24,12 @@ export interface ApiUser {
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
-  constructor(status: number, code: string) {
+  readonly body: Record<string, unknown>;
+  constructor(status: number, code: string, body: Record<string, unknown> = {}) {
     super(`${status} ${code}`);
     this.status = status;
     this.code = code;
+    this.body = body;
   }
 }
 
@@ -72,6 +74,6 @@ export async function api<T>(
     throw new ApiError(0, "network");
   }
   const data = (await res.json().catch(() => ({}))) as { error?: string };
-  if (!res.ok) throw new ApiError(res.status, data.error ?? "http_error");
+  if (!res.ok) throw new ApiError(res.status, data.error ?? "http_error", data as Record<string, unknown>);
   return data as T;
 }

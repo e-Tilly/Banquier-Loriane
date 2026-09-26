@@ -24,7 +24,8 @@ import type { Draft, DraftActivity } from "./types.ts";
 
 export interface PhotoResult { id: string | null; name: string; safety: "approved" | "pending" | "rejected" | "error"; error?: string }
 
-export const MAX_PHOTOS = 8;
+/** Free tier; Business Pro raises it (src/billing/stripe.ts entitlements). */
+export const MAX_PHOTOS = 6;
 
 /**
  * Store uploaded photos against a job or an activity: validate by content, strip metadata,
@@ -33,12 +34,12 @@ export const MAX_PHOTOS = 8;
 export async function storePhotos(
   pool: pg.Pool, deps: Pick<EnrichDeps, "client" | "storage">,
   target: { type: "job" | "activity"; id: string }, userId: string,
-  files: { name: string; bytes: Buffer }[], now: Date,
+  files: { name: string; bytes: Buffer }[], now: Date, limit = MAX_PHOTOS,
 ): Promise<PhotoResult[]> {
   const existing = (await pool.query(
     `SELECT count(*)::int AS n, bool_or(is_hero) AS has_hero FROM media WHERE owner_type = $1 AND owner_id = $2`,
     [target.type, target.id])).rows[0];
-  const room = Math.max(0, MAX_PHOTOS - existing.n);
+  const room = Math.max(0, limit - existing.n);
   const results: PhotoResult[] = [];
   const stored: { id: string; triage: Triage | null; safety: "approved" | "pending" | "rejected" }[] = [];
 

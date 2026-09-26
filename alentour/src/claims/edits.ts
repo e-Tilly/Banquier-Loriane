@@ -10,6 +10,7 @@ import type pg from "pg";
 import { z } from "zod";
 import { parseOpeningHours } from "../catalog/hours.ts";
 import { allSlugs, loadTaxonomy } from "../taxonomy/load.ts";
+import { providerEntitlements } from "../billing/stripe.ts";
 
 const Content = z.object({
   title: z.string().trim().min(2).max(90),
@@ -27,6 +28,8 @@ export const OwnerPatch = z.object({
   openingHours: z.string().trim().max(300).nullable().optional(),
   minAge: z.number().int().min(0).max(99).nullable().optional(),
   weather: z.enum(["indoor", "covered", "outdoor", "either"]).nullable().optional(),
+  /** Business Pro only: a "Book" button in the app. https only. */
+  bookingUrl: z.string().trim().max(300).regex(/^https:\/\/[^\s]+$/).nullable().optional(),
   /** Tri-state: true / false / null (= "I don't know", which removes any claim). */
   a11y: z.record(z.string(), z.boolean().nullable()).optional(),
   tagsAdd: z.array(z.string()).max(20).optional(),
@@ -80,13 +83,19 @@ export async function applyOwnerEdit(
   const exists = await pool.query(`SELECT 1 FROM activities WHERE id = $1`, [activityId]);
   if (!exists.rowCount) return { ok: false, error: "not_found" };
   if (!(await canEdit(pool, userId, activityId))) return { ok: false, error: "forbidden" };
+  if (p.bookingUrl) {
+    const owner = (await pool.query(`SELECT provider_id FROM activities WHERE id = $1`, [activityId])).rows[0];
+    if (!(await providerEntitlements(pool, owner?.provider_id ?? null)).bookingLink) {
+      return { ok: false, error: "invalid", issues: ["bookingUrl: a booking link is part of Business Pro"] };
+    }
+  }
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const cur = (await client.query(
       `SELECT is_free, price_min_cents, price_max_cents, typical_duration_minutes, opening_hours,
-              min_age, weather_dependency
+              min_age, weather_dependency, booking_url
          FROM activities WHERE id = $1 FOR UPDATE`, [activityId])).rows[0];
     const patch: Record<string, unknown> = {};
     const previous: Record<string, unknown> = {};
@@ -102,6 +111,7 @@ export async function applyOwnerEdit(
     set("openingHours", "opening_hours", p.openingHours);
     set("minAge", "min_age", p.minAge);
     set("weather", "weather_dependency", p.weather);
+    set("bookingUrl", "booking_url", p.bookingUrl);
 
     await client.query(
       `UPDATE activities SET
@@ -112,7 +122,8 @@ export async function applyOwnerEdit(
          opening_hours = CASE WHEN $9::boolean THEN $10 ELSE opening_hours END,
          last_verified_at = $11, updated_at = $11,
          min_age = CASE WHEN $12::boolean THEN $13 ELSE min_age END,
-         weather_dependency = CASE WHEN $14::boolean THEN $15 ELSE weather_dependency END
+         weather_dependency = CASE WHEN $14::boolean THEN $15 ELSE weather_dependency END,
+         booking_url = CASE WHEN $16::boolean THEN $17 ELSE booking_url END
        WHERE id = $1`,
       [activityId, p.isFree ?? null,
        p.priceMinCents !== undefined, p.priceMinCents ?? null,
@@ -121,7 +132,8 @@ export async function applyOwnerEdit(
        p.openingHours !== undefined, p.openingHours || null,
        now,
        p.minAge !== undefined, p.minAge ?? null,
-       p.weather !== undefined, p.weather ?? null]);
+       p.weather !== undefined, p.weather ?? null,
+       p.bookingUrl !== undefined, p.bookingUrl ?? null]);
 
     for (const [locale, c] of Object.entries(p.content ?? {})) {
       if (!c) continue;
@@ -201,7 +213,8 @@ export async function ownerListings(pool: pg.Pool, userId: string) {
   const { rows } = await pool.query(
     `SELECT a.id, a.slug, a.status, a.is_free, a.price_min_cents, a.price_max_cents,
             a.typical_duration_minutes, a.opening_hours, a.last_verified_at,
-            a.min_age, a.weather_dependency, a.primary_category, a.kind,
+            a.min_age, a.weather_dependency, a.primary_category, a.kind, a.booking_url, a.provider_id,
+            (SELECT subscription_tier FROM providers pr WHERE pr.id = a.provider_id) AS tier,
             v.id AS venue_id, v.name AS venue_name,
             (SELECT jsonb_object_agg(c.locale, jsonb_build_object('title', c.title, 'summary', c.summary,
                      'description', c.description, 'whatToBring', c.what_to_bring))

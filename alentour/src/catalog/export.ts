@@ -22,7 +22,7 @@ SELECT a.id, a.slug, a.kind, a.primary_category, a.secondary_categories,
        a.duration_min_minutes, a.duration_max_minutes, a.typical_duration_minutes,
        a.physical_demand, a.skill_required, a.risk_tier, a.icebreaker_score,
        a.months_open, a.best_months, a.weather_dependency, a.opening_hours, a.min_age,
-       a.starts_at, a.ends_at, a.tag_slugs, a.quality_score, a.last_verified_at,
+       a.starts_at, a.ends_at, a.tag_slugs, a.quality_score, a.last_verified_at, a.booking_url,
        c.title, c.summary, c.description, c.what_to_bring,
        pl.venue_id AS primary_venue_id, pl.lat, pl.lon,
        (SELECT array_agg(l2.venue_id) FROM activity_locations l2
@@ -102,6 +102,7 @@ export function toCatalogActivity(row: Record<string, any>, now: Date = new Date
   put(a, "startsAt", iso(row.starts_at));
   put(a, "endsAt", iso(row.ends_at));
   put(a, "verifiedAt", iso(row.last_verified_at));
+  put(a, "bookingUrl", row.booking_url);
 
   // Tri-state: only KNOWN values are emitted. An absent key means unknown, never false.
   if (row.a11y && Object.keys(row.a11y).length) a.a11y = row.a11y;

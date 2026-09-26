@@ -72,6 +72,8 @@ export interface CatalogActivity {
   a11y?: Record<string, boolean>;
 
   img?: { key: string; blurhash?: string; w?: number; h?: number };
+  /** Business Pro: where to book. */
+  bookingUrl?: string;
   quality: number;
   verifiedAt?: string;
 }

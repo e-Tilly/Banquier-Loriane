@@ -15,6 +15,7 @@ import { formatPrice, formatDuration, formatDistance, effortLabel, formatDate } 
 import { ListSheet } from "../../components/ListSheet.tsx";
 import { ReportSheet } from "../../components/ReportSheet.tsx";
 import { GoTogether } from "../../components/GoTogether.tsx";
+import { communityApi } from "../../lib/community.ts";
 
 const A11Y_SLUGS = [
   "a11y.step_free_entry", "a11y.wheelchair_throughout", "a11y.accessible_washroom",
@@ -25,8 +26,9 @@ export default function ActivityDetail() {
   const p = usePalette();
   const s = styles(p);
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { catalog, lang, t, rankContext, isSaved, toggleSave } = useStore();
+  const { catalog, lang, t, rankContext, isSaved, toggleSave, account } = useStore();
   const [listOpen, setListOpen] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
 
   // Accept either the id or the slug: shared links use the slug, which survives re-imports.
@@ -150,6 +152,20 @@ export default function ActivityDetail() {
           </Section>
         ) : null}
 
+        {account && saved && !confirmed ? (
+          <View style={s.confirm}>
+            <Text style={s.body}>{t("detail.stillAccurate")}</Text>
+            <View style={{ flexDirection: "row", gap: space.sm }}>
+              {([true, false] as const).map((ok) => (
+                <Pressable key={String(ok)} style={s.confirmBtn} accessibilityRole="button"
+                  onPress={() => { void communityApi(account.token).confirm(activity.id, ok).catch(() => {}); setConfirmed(true); }}>
+                  <Text style={s.secondaryText}>{t(ok ? "detail.accurateYes" : "detail.accurateNo")}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : confirmed ? <Text style={s.muted}>{t("detail.accurateThanks")}</Text> : null}
+
         <Text style={s.verified}>
           {activity.verifiedAt ? t("detail.verified", { date: formatDate(activity.verifiedAt, lang) }) : t("detail.unverified")}
         </Text>
@@ -160,6 +176,11 @@ export default function ActivityDetail() {
           accessibilityRole="button" accessibilityState={{ selected: saved }}>
           <Text style={s.secondaryText}>{saved ? t("detail.saved") : t("detail.save")}</Text>
         </Pressable>
+        {activity.bookingUrl ? (
+          <Pressable style={[s.action, s.secondary]} onPress={() => void Linking.openURL(activity.bookingUrl!)} accessibilityRole="link">
+            <Text style={s.secondaryText}>{t("detail.book")}</Text>
+          </Pressable>
+        ) : null}
         <Pressable style={[s.action, s.primary]} onPress={openMaps} accessibilityRole="button">
           <Text style={s.primaryText}>{t("detail.go")}</Text>
         </Pressable>
@@ -194,6 +215,8 @@ const styles = (p: Palette) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: p.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: p.bg },
   content: { padding: space.lg, gap: space.lg, paddingBottom: space.xxl },
+  confirm: { gap: space.sm, padding: space.md, backgroundColor: p.surface, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule },
+  confirmBtn: { backgroundColor: p.accentSoft, paddingHorizontal: space.lg, paddingVertical: space.sm, borderRadius: radius.pill },
   hero: { width: "100%", aspectRatio: 4 / 3, maxHeight: 360, borderRadius: radius.lg, backgroundColor: p.surfaceAlt },
   kicker: { ...typography.micro, color: p.accent, textTransform: "uppercase" },
   title: { ...typography.display, color: p.ink, marginTop: -space.sm },

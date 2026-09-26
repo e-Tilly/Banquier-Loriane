@@ -73,6 +73,7 @@ export default function Home() {
                 <IconLink p={p} href="/map" glyph="◎" label={t("nav.map")} />
                 <IconLink p={p} href="/saved" glyph="★" label={t("nav.saved")} />
                 {apiEnabled ? <IconLink p={p} href="/outings" glyph="⚑" label={t("nav.outings")} /> : null}
+                {apiEnabled ? <IconLink p={p} href="/add" glyph="＋" label={t("nav.add")} /> : null}
                 <IconLink p={p} href="/settings" glyph="⚙" label={t("nav.settings")} />
               </View>
             </View>
@@ -121,7 +122,7 @@ export default function Home() {
   );
 }
 
-function IconLink({ p, href, glyph, label }: { p: Palette; href: "/map" | "/saved" | "/settings" | "/outings"; glyph: string; label: string }) {
+function IconLink({ p, href, glyph, label }: { p: Palette; href: "/map" | "/saved" | "/settings" | "/outings" | "/add"; glyph: string; label: string }) {
   return (
     <Link href={href} asChild>
       <Pressable hitSlop={8} accessibilityRole="button" accessibilityLabel={label}

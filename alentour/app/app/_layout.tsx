@@ -38,6 +38,7 @@ function Screens() {
       <Stack.Screen name="settings" options={{ title: t("nav.settings") }} />
       <Stack.Screen name="signin" options={{ title: t("signin.title"), presentation: "modal" }} />
       <Stack.Screen name="activity/[id]" options={{ title: "" }} />
+      <Stack.Screen name="add" options={{ title: t("nav.add"), presentation: "modal" }} />
       <Stack.Screen name="outings/index" options={{ title: t("nav.outings") }} />
       <Stack.Screen name="outings/[id]" options={{ title: "" }} />
       <Stack.Screen name="outings/setup" options={{ title: t("setup.title"), presentation: "modal" }} />
