@@ -174,4 +174,14 @@ INSERT INTO activity_tags (activity_id, tag_slug, value, source, confidence) VAL
  ('b0000001-0000-4000-8000-00000000000a','vibe.rainy_day',true,'ai',0.8)
 ON CONFLICT DO NOTHING;
 
+-- websites: what makes the instant email-domain claim possible
+UPDATE venues SET website = w.url FROM (VALUES
+ ('a0000001-0000-4000-8000-000000000001','https://www.allezup.com'),
+ ('a0000001-0000-4000-8000-000000000003','https://lerandolph.com'),
+ ('a0000001-0000-4000-8000-000000000004','https://botabota.ca'),
+ ('a0000001-0000-4000-8000-000000000006','https://www.mbam.qc.ca'),
+ ('a0000001-0000-4000-8000-000000000008','https://www.ceramiccafe.ca'),
+ ('a0000001-0000-4000-8000-00000000000a','https://www.labescape.ca')
+) AS w(id, url) WHERE venues.id = w.id::uuid;
+
 COMMIT;

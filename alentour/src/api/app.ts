@@ -14,6 +14,8 @@ import { authRoutes } from "./routes/auth.ts";
 import { meRoutes } from "./routes/me.ts";
 import { libraryRoutes } from "./routes/library.ts";
 import { reportRoutes } from "./routes/reports.ts";
+import { claimRoutes, ownerRoutes } from "./routes/claims.ts";
+import { ownerPages } from "./pages/owner.ts";
 
 export function createApp(d: Deps, opts: { trustProxy?: boolean } = {}) {
   const app = new Hono<AppEnv>();
@@ -36,6 +38,10 @@ export function createApp(d: Deps, opts: { trustProxy?: boolean } = {}) {
   app.route("/v1/me", meRoutes(d));
   app.route("/v1/library", libraryRoutes(d));
   app.route("/v1/reports", reportRoutes(d));
+  app.route("/v1/claims", claimRoutes(d));
+  app.route("/v1/owner", ownerRoutes(d));
+  // Server-rendered pages for business owners — a web form, not an app (docs/alentour/02).
+  app.route("/owner", ownerPages(d));
 
   app.notFound((c) => c.json({ error: "not_found" }, 404));
   app.onError((err, c) => {
