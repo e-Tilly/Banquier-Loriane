@@ -15,10 +15,16 @@
  *   npm run admin -- media-ok <media-id> | media-no <media-id>
  *   npm run admin -- jobs                       recent enrichment jobs, with token use
  *   npm run admin -- stale                      published listings nobody confirmed in a year
+ *   npm run admin -- outings                    paused and upcoming outings
+ *   npm run admin -- unpause <outing-id> | cancel <outing-id> "why"
+ *   npm run admin -- pause-outings on|off       the whole feature (joins, votes, new outings)
+ *   npm run admin -- pause-creation on|off      only new outings — flip this before going away
+ *   npm run admin -- restrict <user-id> <days>  keep someone out of outings for a while
  */
 import pg from "pg";
 import { approveClaim, rejectClaim } from "../src/claims/claims.ts";
 import { staleListings } from "../src/freshness/nudge.ts";
+import { setSettings } from "../src/outings/core.ts";
 
 const REVIEWER = `admin:${process.env.USER ?? "cli"}`;
 
@@ -35,7 +41,9 @@ export async function run(pool: pg.Pool, argv: string[], out: (s: string) => voi
         (SELECT count(*) FROM reports WHERE status = 'open')::int AS open_reports,
         (SELECT count(*) FROM reports WHERE status = 'open' AND severity >= 3)::int AS urgent_reports,
         (SELECT count(*) FROM activities WHERE status = 'pending_review')::int AS pending_listings,
-        (SELECT count(*) FROM media WHERE safety_status = 'pending')::int AS pending_media`);
+        (SELECT count(*) FROM media WHERE safety_status = 'pending')::int AS pending_media,
+        (SELECT count(*) FROM outings WHERE status = 'paused')::int AS paused_outings,
+        (SELECT count(*) FROM outings WHERE status = 'confirmed' AND starts_at > now())::int AS upcoming_outings`);
       for (const [k, v] of Object.entries(rows[0])) out(`${k.padEnd(16)} ${v}`);
       return 0;
     }
@@ -170,9 +178,56 @@ export async function run(pool: pg.Pool, argv: string[], out: (s: string) => voi
       for (const r of rows) out(`${r.id}  ${r.last_verified_at ? r.last_verified_at.toISOString().slice(0, 10) : "never"}  [${r.origin}] ${r.title}${r.provider ? ` — ${r.provider}` : ""}`);
       return 0;
     }
+    case "outings": {
+      const { rows } = await pool.query(
+        `SELECT o.id, o.mode, o.organizer, o.status, o.starts_at, o.paused_reason, v.name AS venue,
+                (SELECT count(*)::int FROM outing_participants p WHERE p.outing_id = o.id AND p.status = 'going') AS going,
+                (SELECT count(*)::int FROM reports r WHERE r.subject_type = 'outing' AND r.subject_id = o.id::text AND r.status = 'open') AS reports
+           FROM outings o JOIN venues v ON v.id = o.venue_id
+          WHERE o.status = 'paused' OR (o.status IN ('voting', 'confirmed') AND COALESCE(o.starts_at, o.decision_deadline) < now() + interval '7 days')
+          ORDER BY o.status = 'paused' DESC, COALESCE(o.starts_at, o.decision_deadline) LIMIT 100`);
+      const { rows: s } = await pool.query(`SELECT value FROM app_settings WHERE key = 'outings'`);
+      out(`feature: ${JSON.stringify(s[0]?.value ?? {})}`);
+      if (!rows.length) { out("No paused or upcoming outings."); return 0; }
+      for (const r of rows) {
+        out(`${r.status === "paused" ? "⏸ " : "  "}${r.id}  ${r.mode.padEnd(13)} ${r.status.padEnd(9)} ${r.starts_at ? r.starts_at.toISOString().slice(0, 16) : "voting"}  ${r.venue}  ${r.going} going${r.reports ? `  ⚠ ${r.reports} open report(s)` : ""}${r.paused_reason ? `  (${r.paused_reason})` : ""}`);
+      }
+      return 0;
+    }
+    case "unpause": {
+      if (!args[0]) { out("usage: unpause <outing-id>"); return 2; }
+      const r = await pool.query(
+        `UPDATE outings SET status = CASE WHEN mode = 'rally' AND starts_at IS NULL THEN 'voting' ELSE 'confirmed' END,
+                paused_at = NULL, paused_reason = NULL, updated_at = now() WHERE id = $1 AND status = 'paused'`, [args[0]]);
+      out(r.rowCount ? "✓ resumed" : "not found or not paused");
+      return r.rowCount ? 0 : 1;
+    }
+    case "cancel": {
+      if (!args[0]) { out('usage: cancel <outing-id> "why"'); return 2; }
+      const r = await pool.query(
+        `UPDATE outings SET status = 'cancelled', cancel_reason = $2, updated_at = now() WHERE id = $1 AND status IN ('voting', 'confirmed', 'paused')`,
+        [args[0], args[1] ?? "operator"]);
+      out(r.rowCount ? "✓ cancelled" : "not found");
+      return r.rowCount ? 0 : 1;
+    }
+    case "pause-outings":
+    case "pause-creation": {
+      if (args[0] !== "on" && args[0] !== "off") { out(`usage: ${cmd} on|off`); return 2; }
+      const s = await setSettings(pool, cmd === "pause-outings" ? { paused: args[0] === "on" } : { creationPaused: args[0] === "on" });
+      out(`✓ ${JSON.stringify(s)}`);
+      return 0;
+    }
+    case "restrict": {
+      const days = Number(args[1]);
+      if (!args[0] || !Number.isFinite(days)) { out("usage: restrict <user-id> <days>"); return 2; }
+      const r = await pool.query(`UPDATE users SET restricted_until = now() + make_interval(days => $2) WHERE id = $1`, [args[0], days]);
+      out(r.rowCount ? `✓ restricted for ${days} day(s)` : "not found");
+      return r.rowCount ? 0 : 1;
+    }
     default:
       out("commands: stats | claims | approve <id> | reject <id> \"why\" | reports | resolve <id> actioned|dismissed \"note\"" +
-        " | pending | publish <venue-id> | hide <activity-id> | media | media-ok <id> | media-no <id> | jobs | stale");
+        " | pending | publish <venue-id> | hide <activity-id> | media | media-ok <id> | media-no <id> | jobs | stale" +
+        " | outings | unpause <id> | cancel <id> | pause-outings on|off | pause-creation on|off | restrict <user-id> <days>");
       return cmd ? 2 : 0;
   }
 }

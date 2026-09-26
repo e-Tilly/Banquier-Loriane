@@ -3,6 +3,8 @@ import type { JWTVerifyGetKey } from "jose";
 import type { ApiConfig } from "./config.ts";
 import type { Mailer } from "./mailer.ts";
 import type { EnrichDeps } from "../enrichment/pipeline.ts";
+import type { Sms } from "../outings/phone.ts";
+import type { Pusher } from "../outings/notify.ts";
 
 /** Everything the API needs from the outside world, injected so tests can control it. */
 export interface Deps {
@@ -14,6 +16,10 @@ export interface Deps {
   jwks?: { apple?: JWTVerifyGetKey; google?: JWTVerifyGetKey };
   /** Stage 4: the enrichment pipeline, photo storage and geocoding. Absent: onboarding is off. */
   enrich?: EnrichDeps;
+  /** Stage 5: SMS for phone verification, push for outing notifications, the operator's alerts. */
+  sms?: Sms;
+  pusher?: Pusher;
+  operatorEmail?: string | null;
 }
 
 export interface SessionUser {

@@ -73,6 +73,13 @@ ORDER BY weight DESC
 LIMIT 3;
 `;
 
+/** Rallies at this venue that found no time: people wanted to go and could not get a group. */
+const FAILED_RALLIES_QUERY = `
+SELECT count(*)::int AS n FROM outings
+ WHERE venue_id = $1 AND mode = 'rally' AND status = 'cancelled' AND cancel_reason = 'no_quorum'
+   AND created_at > now() - ($2 || ' days')::interval;
+`;
+
 const SEGMENT_QUERY = `
 SELECT count(DISTINCT s.user_id) FILTER (WHERE u.trust_level = 0)::int   AS new_to_app,
        count(DISTINCT s.user_id) FILTER (
@@ -105,9 +112,10 @@ export async function findDemandSignals(
 
   const signals: Omit<DemandSignal, "id">[] = [];
   for (const row of rows) {
-    const [slots, segments] = await Promise.all([
+    const [slots, segments, failed] = await Promise.all([
       pool.query(SLOT_QUERY, [row.venue_id, windowDays]),
       pool.query(SEGMENT_QUERY, [row.venue_id, windowDays]),
+      pool.query(FAILED_RALLIES_QUERY, [row.venue_id, windowDays]),
     ]);
 
     signals.push({
@@ -118,7 +126,7 @@ export async function findDemandSignals(
       windowDays,
       distinctUsers: row.distinct_users,
       savesCount: row.saves_count,
-      failedRallies: 0,               // populated once rallies exist (Stage 5)
+      failedRallies: failed.rows[0]?.n ?? 0,
       topSlots: slots.rows as TimeSlot[],
       segments: stripZeros(segments.rows[0] ?? {}),
       computedAt: new Date(),

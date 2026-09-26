@@ -14,6 +14,7 @@ import { usePalette, space, radius, typography, type Palette } from "../../lib/t
 import { formatPrice, formatDuration, formatDistance, effortLabel, formatDate } from "../../lib/format.ts";
 import { ListSheet } from "../../components/ListSheet.tsx";
 import { ReportSheet } from "../../components/ReportSheet.tsx";
+import { GoTogether } from "../../components/GoTogether.tsx";
 
 const A11Y_SLUGS = [
   "a11y.step_free_entry", "a11y.wheelchair_throughout", "a11y.accessible_washroom",
@@ -138,6 +139,8 @@ export default function ActivityDetail() {
             </View>
           </Section>
         ) : null}
+
+        <GoTogether activityId={activity.id} />
 
         {venue ? (
           <Section p={p} title={t("detail.where")}>

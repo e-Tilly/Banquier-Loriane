@@ -4,6 +4,8 @@ import type { AppEnv, Deps } from "../context.ts";
 import { parseBody } from "../http.ts";
 import { hmac } from "../crypto.ts";
 import { RateLimiter } from "../ratelimit.ts";
+import { onReport } from "../../outings/safety.ts";
+import { safetyDeps } from "./outings.ts";
 
 const REASONS = ["closed", "hours", "price", "a11y", "missing", "dangerous", "other",
   "harassment", "spam", "inappropriate", "safety"] as const;
@@ -38,7 +40,12 @@ export function reportRoutes(d: Deps) {
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
       [c.get("user")?.id ?? null, subjectType, subjectId, reason, details || null,
        severityOf(reason), hmac(d.config.secret, c.get("ip"))]);
-    return c.json({ ok: true, id: rows[0].id }, 201);
+    // Fail-safe: anything about an outing, a chat message or a person pauses the outing now,
+    // pending review, rather than waiting for a solo operator to wake up (docs/alentour/08).
+    const paused = await onReport(d.pool, safetyDeps(d), {
+      subjectType, subjectId, reporterId: c.get("user")?.id ?? null, severity: severityOf(reason),
+    }, d.now ? d.now() : new Date());
+    return c.json({ ok: true, id: rows[0].id, paused: paused.length > 0 }, 201);
   });
 
   return app;

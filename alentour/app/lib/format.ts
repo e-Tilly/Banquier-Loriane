@@ -37,3 +37,10 @@ export function formatDate(iso: string, lang: Lang): string {
     year: "numeric", month: "long", day: "numeric",
   });
 }
+
+/** "sam. 5 sept., 19 h" — outing times, always in Montréal time whatever the phone's zone. */
+export function formatWhen(iso: string, lang: Lang): string {
+  return new Date(iso).toLocaleString(lang === "fr" ? "fr-CA" : "en-CA", {
+    timeZone: "America/Toronto", weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit",
+  });
+}

@@ -14,6 +14,9 @@ import { NodeFetcher } from "../enrichment/net.ts";
 import { NominatimGeocoder } from "../enrichment/geo.ts";
 import { storageFromEnv } from "../enrichment/storage.ts";
 import { startWorker, type EnrichDeps } from "../enrichment/pipeline.ts";
+import { smsFromEnv } from "../outings/phone.ts";
+import { ExpoPusher } from "../outings/notify.ts";
+import { startOutingsClock } from "../outings/lifecycle.ts";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
 
@@ -30,13 +33,19 @@ const worker = startWorker(pool, enrich);
 enrich.kick = worker.kick;
 worker.kick();   // pick up anything a previous process left mid-way
 
+const mailer = mailerFromEnv();
+const pusher = new ExpoPusher();
+const operatorEmail = process.env.OPERATOR_EMAIL ?? null;
+// The outing clock: sessions, concierge rallies, deadlines, reminders, chat purge.
+const clock = startOutingsClock(pool, { client: enrich.client, pusher, mailer, operatorEmail });
+
 const app = createApp(
-  { pool, mailer: mailerFromEnv(), config: configFromEnv(), enrich },
+  { pool, mailer, config: configFromEnv(), enrich, sms: smsFromEnv(), pusher, operatorEmail },
   { trustProxy: process.env.TRUST_PROXY === "1" },
 );
 const port = Number(process.env.PORT ?? 8787);
 serve({ fetch: app.fetch, port }, (info) => console.log(`Alentour API on http://localhost:${info.port}`));
 
-const shutdown = async () => { worker.stop(); await pool.end(); process.exit(0); };
+const shutdown = async () => { worker.stop(); clock.stop(); await pool.end(); process.exit(0); };
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);

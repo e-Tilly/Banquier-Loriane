@@ -75,12 +75,14 @@ function dayIndex(s: string): number {
 
 /** `at` must already be in the venue's local time. */
 export function isOpenAt(spec: string | undefined, at: Date): OpenState {
+  return openStateAt(spec, at.getDay(), at.getHours() * 60 + at.getMinutes());
+}
+
+/** The same test from a weekday (0 = Sunday) and minutes after local midnight — no Date needed. */
+export function openStateAt(spec: string | null | undefined, day: number, minutes: number): OpenState {
   if (!spec) return "unknown";
   const spans = parseOpeningHours(spec);
   if (!spans) return "unknown";
-
-  const day = at.getDay();
-  const minutes = at.getHours() * 60 + at.getMinutes();
 
   for (const s of spans) {
     if (s.closed && s.days.has(day)) return "closed";
@@ -96,4 +98,15 @@ export function isOpenAt(spec: string | undefined, at: Date): OpenState {
     }
   }
   return "closed";
+}
+
+/** Open periods that START on a weekday, as minutes after local midnight (`to` may pass 1440). */
+export function openSpansOn(spec: string | null | undefined, day: number): { from: number; to: number }[] {
+  const spans = spec ? parseOpeningHours(spec) : null;
+  if (!spans) return [];
+  if (spans.some((s) => s.closed && s.days.has(day))) return [];
+  return spans
+    .filter((s) => !s.closed && s.days.has(day))
+    .map((s) => ({ from: s.from, to: s.to > s.from ? s.to : s.to + 1440 }))
+    .sort((a, b) => a.from - b.from);
 }

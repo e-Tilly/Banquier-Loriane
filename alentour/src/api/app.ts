@@ -16,6 +16,7 @@ import { libraryRoutes } from "./routes/library.ts";
 import { reportRoutes } from "./routes/reports.ts";
 import { claimRoutes, ownerRoutes } from "./routes/claims.ts";
 import { ownerPages } from "./pages/owner.ts";
+import { outingRoutes } from "./routes/outings.ts";
 import { LocalStorage } from "../enrichment/storage.ts";
 
 export function createApp(d: Deps, opts: { trustProxy?: boolean } = {}) {
@@ -45,6 +46,7 @@ export function createApp(d: Deps, opts: { trustProxy?: boolean } = {}) {
   app.route("/v1/reports", reportRoutes(d));
   app.route("/v1/claims", claimRoutes(d));
   app.route("/v1/owner", ownerRoutes(d));
+  app.route("/v1/outings", outingRoutes(d));
   // Server-rendered pages for business owners — a web form, not an app (docs/alentour/02).
   app.route("/owner", ownerPages(d));
 
