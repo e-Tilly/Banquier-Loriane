@@ -3,7 +3,7 @@
  * One context with plain hooks — a solo codebase does not need a state-management library.
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Linking, Platform } from "react-native";
+import { AppState, Linking, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import type { CatalogFile } from "@core/catalog/types.ts";
@@ -16,6 +16,7 @@ import {
   deleteList as libDeleteList, mergeLibraries,
 } from "@core/user/library.ts";
 import { loadCatalog, loadWeather } from "./catalog.ts";
+import { api, apiEnabled, loadToken, saveToken, type ApiUser } from "./api.ts";
 import { deviceLang, localeOf, translate, type Key, type Lang } from "./i18n.ts";
 import { config } from "./config.ts";
 
@@ -28,7 +29,20 @@ const LANG_KEY = "lang.v1";
 
 export type ReportReason = "closed" | "hours" | "price" | "a11y" | "missing" | "dangerous" | "other";
 
+export interface Account { token: string; user: ApiUser }
+export type SyncState = "idle" | "syncing" | "error";
+
 export interface Store {
+  /** Stage 2+: null when signed out, or when no API is configured (Stage 1). */
+  account: Account | null;
+  apiEnabled: boolean;
+  syncState: SyncState;
+  startSignIn: (email: string) => Promise<void>;
+  verifySignIn: (email: string, code: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
+  exportData: () => Promise<string>;
+  updateProfile: (patch: { displayName?: string | null; birthYear?: number }) => Promise<void>;
   catalog: CatalogFile | null;
   loading: boolean;
   error: string | null;
@@ -68,7 +82,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [filters, setFilters] = useState<Filters>({ maxDistanceKm: 10 });
   const [library, setLibrary] = useState<Library>(emptyLibrary);
   const [tick, setTick] = useState(0);
+  const [account, setAccount] = useState<Account | null>(null);
+  const [syncState, setSyncState] = useState<SyncState>("idle");
   const libraryLoaded = useRef(false);
+  const libraryRef = useRef<Library>(library);
+  libraryRef.current = library;
+  /** JSON of the library as last agreed with the server — lets sync skip no-op rounds. */
+  const lastSynced = useRef<string | null>(null);
 
   // Language preference and library, once.
   useEffect(() => {
@@ -90,6 +110,50 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       libraryLoaded.current = true;
     })();
   }, []);
+
+  // Restore the session, if there is one and an API is configured.
+  useEffect(() => {
+    if (!apiEnabled()) return;
+    void (async () => {
+      const token = await loadToken();
+      if (!token) return;
+      try {
+        const r = await api<{ user: ApiUser }>("GET", "/v1/me", undefined, token);
+        setAccount({ token, user: r.user });
+      } catch (err) {
+        // Only a definite 401 signs you out; offline keeps the token for next time.
+        if ((err as { status?: number }).status === 401) await saveToken(null);
+      }
+    })();
+  }, []);
+
+  const sync = useCallback(async (acc: Account) => {
+    setSyncState("syncing");
+    try {
+      const r = await api<{ library: Library }>("PUT", "/v1/library", { library: libraryRef.current }, acc.token);
+      const merged = mergeLibraries(libraryRef.current, parseLibrary(r.library));
+      lastSynced.current = JSON.stringify(merged);
+      setLibrary(merged);
+      setSyncState("idle");
+    } catch (err) {
+      setSyncState("error");
+      if ((err as { status?: number }).status === 401) { await saveToken(null); setAccount(null); }
+    }
+  }, []);
+
+  // Sync when signed in, when the library changes (debounced), and when the app returns to the foreground.
+  useEffect(() => {
+    if (!account || !libraryLoaded.current) return;
+    if (JSON.stringify(library) === lastSynced.current) return;
+    const id = setTimeout(() => void sync(account), 1500);
+    return () => clearTimeout(id);
+  }, [account, library, sync]);
+
+  useEffect(() => {
+    if (!account) return;
+    const sub = AppState.addEventListener("change", (s) => { if (s === "active") void sync(account); });
+    return () => sub.remove();
+  }, [account, sync]);
 
   // Persist the library whenever it changes (after the initial load).
   useEffect(() => {
@@ -157,6 +221,43 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setLibrary((lib) => mergeLibraries(lib, incoming));
   }, []);
 
+  const startSignIn = useCallback(async (email: string) => {
+    await api("POST", "/v1/auth/email/start", { email, lang });
+  }, [lang]);
+
+  const verifySignIn = useCallback(async (email: string, code: string) => {
+    const r = await api<{ token: string; user: ApiUser }>("POST", "/v1/auth/email/verify", { email, code });
+    await saveToken(r.token);
+    lastSynced.current = null;                 // first sync merges this device into the account
+    setAccount({ token: r.token, user: r.user });
+  }, []);
+
+  const signOut = useCallback(async () => {
+    const acc = account;
+    setAccount(null);
+    await saveToken(null);
+    if (acc) await api("POST", "/v1/auth/logout", undefined, acc.token).catch(() => {});
+  }, [account]);
+
+  const deleteAccount = useCallback(async () => {
+    if (!account) return;
+    await api("DELETE", "/v1/me", undefined, account.token);
+    await saveToken(null);
+    setAccount(null);
+  }, [account]);
+
+  const exportData = useCallback(async () => {
+    if (!account) throw new Error("not signed in");
+    const data = await api<unknown>("GET", "/v1/me/export", undefined, account.token);
+    return JSON.stringify(data, null, 2);
+  }, [account]);
+
+  const updateProfile = useCallback(async (patch: { displayName?: string | null; birthYear?: number }) => {
+    if (!account) return;
+    const r = await api<{ user: ApiUser }>("PATCH", "/v1/me", patch, account.token);
+    setAccount({ ...account, user: r.user });
+  }, [account]);
+
   const t = useCallback(
     (key: Key, vars?: Record<string, string | number>) => translate(key, lang, vars),
     [lang],
@@ -164,19 +265,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const report = useCallback(async (activityId: string, reason: ReportReason, details: string) => {
     if (config.apiUrl) {
-      const res = await fetch(`${config.apiUrl}/v1/reports`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ subjectType: "activity", subjectId: activityId, reason, details }),
-      });
-      if (!res.ok) throw new Error(`Report failed: HTTP ${res.status}`);
+      await api("POST", "/v1/reports", { subjectType: "activity", subjectId: activityId, reason, details }, account?.token);
       return;
     }
     // Stage 1 has no backend: fall back to email so reports are never silently dropped.
     const subject = encodeURIComponent(`[Alentour] ${reason} — ${activityId}`);
     const body = encodeURIComponent(`${details}\n\nActivity: ${activityId}\nPlatform: ${Platform.OS}`);
     await Linking.openURL(`mailto:${config.supportEmail}?subject=${subject}&body=${body}`);
-  }, []);
+  }, [account]);
 
   const conditions = useMemo(() => currentConditions(weather, new Date()), [weather, tick]);
 
@@ -196,6 +292,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }), [position, conditions, savedSet, tick]);
 
   const value: Store = {
+    account, apiEnabled: apiEnabled(), syncState,
+    startSignIn, verifySignIn, signOut, deleteAccount, exportData, updateProfile,
     catalog, loading, error, lang, langOverride, setLangOverride, t,
     position, hasPreciseLocation, requestLocation, conditions,
     filters, setFilters, library, mergeLibrary,

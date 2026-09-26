@@ -182,6 +182,45 @@ const dict = {
   },
   "settings.privacy": { fr: "Confidentialité", en: "Privacy" },
   "settings.version": { fr: "Version {v}", en: "Version {v}" },
+
+  // account
+  "account.title": { fr: "Compte", en: "Account" },
+  "account.pitch": {
+    fr: "Retrouve tes enregistrés et tes listes sur tous tes appareils.",
+    en: "Keep your saves and lists across all your devices.",
+  },
+  "account.signIn": { fr: "Se connecter", en: "Sign in" },
+  "account.signedInAs": { fr: "Connecté : {email}", en: "Signed in: {email}" },
+  "account.syncing": { fr: "Synchronisation…", en: "Syncing…" },
+  "account.synced": { fr: "À jour sur tous tes appareils", en: "Up to date on all your devices" },
+  "account.syncError": { fr: "Hors ligne — on réessaiera", en: "Offline — will retry" },
+  "account.export": { fr: "Exporter mes données", en: "Export my data" },
+  "account.signOut": { fr: "Se déconnecter", en: "Sign out" },
+  "account.delete": { fr: "Supprimer mon compte", en: "Delete my account" },
+  "account.deleteConfirm": {
+    fr: "Ton compte, tes listes et tes enregistrés seront effacés. C'est définitif.",
+    en: "Your account, lists and saves will be erased. This cannot be undone.",
+  },
+  "account.deleted": { fr: "Compte supprimé.", en: "Account deleted." },
+  "signin.title": { fr: "Connexion", en: "Sign in" },
+  "signin.emailLabel": { fr: "Ton courriel", en: "Your email" },
+  "signin.sendCode": { fr: "Recevoir un code", en: "Send me a code" },
+  "signin.codeSent": { fr: "Code envoyé à {email}", en: "Code sent to {email}" },
+  "signin.codeLabel": { fr: "Code à 6 chiffres", en: "6-digit code" },
+  "signin.verify": { fr: "Se connecter", en: "Sign in" },
+  "signin.resend": { fr: "Renvoyer le code", en: "Resend code" },
+  "signin.changeEmail": { fr: "Changer de courriel", en: "Use a different email" },
+  "signin.privacy": {
+    fr: "Pas de mot de passe. On garde seulement ton courriel, jamais ta position.",
+    en: "No password. We only keep your email — never your location.",
+  },
+  "error.invalid_email": { fr: "Ce courriel ne semble pas valide.", en: "That email doesn't look right." },
+  "error.invalid_code": { fr: "Code incorrect.", en: "Wrong code." },
+  "error.expired": { fr: "Ce code a expiré. Demandes-en un nouveau.", en: "That code expired. Ask for a new one." },
+  "error.too_many_attempts": { fr: "Trop d'essais. Demande un nouveau code.", en: "Too many tries. Ask for a new code." },
+  "error.rate_limited": { fr: "Trop de demandes. Réessaie dans un moment.", en: "Too many requests. Try again shortly." },
+  "error.network": { fr: "Pas de connexion. Réessaie.", en: "No connection. Try again." },
+  "error.generic": { fr: "Quelque chose a mal tourné. Réessaie.", en: "Something went wrong. Try again." },
 } as const;
 
 export type Key = keyof typeof dict;

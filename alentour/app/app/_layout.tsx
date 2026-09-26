@@ -36,6 +36,7 @@ function Screens() {
       <Stack.Screen name="map" options={{ title: t("nav.map") }} />
       <Stack.Screen name="saved" options={{ title: t("nav.saved") }} />
       <Stack.Screen name="settings" options={{ title: t("nav.settings") }} />
+      <Stack.Screen name="signin" options={{ title: t("signin.title"), presentation: "modal" }} />
       <Stack.Screen name="activity/[id]" options={{ title: "" }} />
     </Stack>
   );

@@ -1,6 +1,7 @@
 /** Language, location, data freshness, and the open-data attribution the licences require. */
-import React from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import React, { useState } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Platform, Share } from "react-native";
+import { Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
 import { useStore } from "../lib/store.tsx";
@@ -11,7 +12,34 @@ import type { Lang } from "../lib/i18n.ts";
 export default function Settings() {
   const p = usePalette();
   const s = styles(p);
-  const { t, lang, langOverride, setLangOverride, hasPreciseLocation, requestLocation, catalog } = useStore();
+  const {
+    t, lang, langOverride, setLangOverride, hasPreciseLocation, requestLocation, catalog,
+    apiEnabled, account, syncState, signOut, deleteAccount, exportData,
+  } = useStore();
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const confirmDelete = () => {
+    const doIt = async () => {
+      try { await deleteAccount(); setNotice(t("account.deleted")); }
+      catch { setNotice(t("error.generic")); }
+    };
+    if (Platform.OS === "web") {
+      // eslint-disable-next-line no-alert
+      if (typeof window !== "undefined" && window.confirm(t("account.deleteConfirm"))) void doIt();
+      return;
+    }
+    Alert.alert(t("account.delete"), t("account.deleteConfirm"), [
+      { text: t("report.cancel"), style: "cancel" },
+      { text: t("account.delete"), style: "destructive", onPress: () => void doIt() },
+    ]);
+  };
+
+  const doExport = async () => {
+    try {
+      const json = await exportData();
+      await Share.share({ message: json, title: "alentour-export.json" });
+    } catch { setNotice(t("error.generic")); }
+  };
 
   const choices: { value: Lang | null; label: string }[] = [
     { value: null, label: t("settings.langAuto") },
@@ -22,6 +50,40 @@ export default function Settings() {
   return (
     <SafeAreaView style={s.screen} edges={["bottom"]}>
       <ScrollView contentContainerStyle={s.content}>
+        {apiEnabled ? (
+          <Group p={p} title={t("account.title")}>
+            {account ? (
+              <>
+                <View style={s.row}>
+                  <Text style={s.rowText}>{t("account.signedInAs", { email: account.user.email ?? "—" })}</Text>
+                </View>
+                <Text style={s.note}>
+                  {syncState === "syncing" ? t("account.syncing") : syncState === "error" ? t("account.syncError") : t("account.synced")}
+                </Text>
+                <Pressable style={s.row} onPress={doExport} accessibilityRole="button">
+                  <Text style={[s.rowText, s.link]}>{t("account.export")}</Text>
+                </Pressable>
+                <Pressable style={s.row} onPress={() => void signOut()} accessibilityRole="button">
+                  <Text style={[s.rowText, s.link]}>{t("account.signOut")}</Text>
+                </Pressable>
+                <Pressable style={s.row} onPress={confirmDelete} accessibilityRole="button">
+                  <Text style={[s.rowText, s.danger]}>{t("account.delete")}</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={s.note}>{t("account.pitch")}</Text>
+                <Link href="/signin" asChild>
+                  <Pressable style={s.row} accessibilityRole="button">
+                    <Text style={[s.rowText, s.link]}>{t("account.signIn")}</Text>
+                  </Pressable>
+                </Link>
+              </>
+            )}
+            {notice ? <Text style={s.note}>{notice}</Text> : null}
+          </Group>
+        ) : null}
+
         <Group p={p} title={t("settings.language")}>
           {choices.map((c) => {
             const on = langOverride === c.value;
@@ -90,6 +152,7 @@ const styles = (p: Palette) => StyleSheet.create({
   },
   rowText: { ...typography.body, color: p.ink },
   link: { color: p.accent, fontWeight: "600" },
+  danger: { color: p.danger, fontWeight: "600" },
   tick: { ...typography.heading, color: p.accent },
   note: { ...typography.small, color: p.ink3, padding: space.md, lineHeight: 19 },
   version: { ...typography.micro, color: p.ink4, textAlign: "center" },
