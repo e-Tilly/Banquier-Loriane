@@ -2,7 +2,7 @@
  * Transactional email. Resend's free tier (3,000/month) covers a side project's sign-in codes
  * at $0; anything with the same `send` shape can replace it.
  */
-export interface Mail { to: string; subject: string; text: string }
+export interface Mail { to: string; subject: string; text: string; replyTo?: string; headers?: Record<string, string> }
 export interface Mailer { send(mail: Mail): Promise<void> }
 
 /** Development: prints the code to the server log. */
@@ -32,7 +32,10 @@ export class ResendMailer implements Mailer {
     const res = await this.fetchImpl("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${this.apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ from: this.from, to: [m.to], subject: m.subject, text: m.text }),
+      body: JSON.stringify({
+        from: this.from, to: [m.to], subject: m.subject, text: m.text,
+        ...(m.replyTo ? { reply_to: m.replyTo } : {}), ...(m.headers ? { headers: m.headers } : {}),
+      }),
     });
     if (!res.ok) throw new Error(`Resend responded ${res.status}`);
   }

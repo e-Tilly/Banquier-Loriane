@@ -32,6 +32,12 @@ saved the same thing and turn it into an actual plan on an actual date.
 | 11 | [Legal & privacy](11-legal-and-compliance.md) | Law 25, liability, data licensing |
 | 12 | [Monetization & metrics](12-monetization-and-metrics.md) | Side-project economics, five numbers to watch |
 | 13 | [Risks & next steps](13-risks-and-open-questions.md) | **What to do in your first two weeks** |
+| 14 | [Outreach agent](14-outreach-agent.md) | The AI ambassador that writes to businesses, within CASL |
+| 15 | [Deploy & operate](15-deploy-and-operate.md) | **Putting it online, stage by stage, and the 15-minute daily routine** |
+
+**Implementation status:** all six stages are built in [`alentour/`](../../alentour/) — see its
+[README](../../alentour/README.md). What remains is not code: curation, the lawyer review, store
+accounts, and the stage gates in [12](12-monetization-and-metrics.md).
 
 ---
 

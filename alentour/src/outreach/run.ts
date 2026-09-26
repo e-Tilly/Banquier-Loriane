@@ -12,7 +12,7 @@
  */
 import pg from "pg";
 import { findDemandSignals } from "./demand.ts";
-import { gate } from "./consent.ts";
+import { gate, venueLocalNow } from "./consent.ts";
 import { draftMessage } from "./draft.ts";
 import { verifyDraft } from "./verify.ts";
 import { renderEmail, senderFromEnv } from "./render.ts";
@@ -54,6 +54,7 @@ async function main(): Promise<void> {
       history,
       suppressed,
       now,
+      localNow: venueLocalNow(now, "America/Toronto")   // one city; every venue is in Montréal time,
     });
 
     if (!verdict.allowed) {
@@ -77,7 +78,7 @@ async function main(): Promise<void> {
       Object.assign(draft, retry);
     }
 
-    const rendered = renderEmail(draft, sender, "PREVIEW-TOKEN");
+    const rendered = renderEmail(draft, sender, "PREVIEW-TOKEN", verdict.basis);
     queued++;
 
     console.log(`\n${"─".repeat(72)}`);

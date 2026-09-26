@@ -1,0 +1,7 @@
+node_modules
+app
+out
+var
+test
+.env
+*.log

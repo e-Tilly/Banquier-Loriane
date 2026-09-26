@@ -14,7 +14,8 @@
         {
           "locationWhenInUsePermission": "Alentour utilise ta position pour te montrer quoi faire proche de toi. Rien n'est partagé avec d'autres personnes."
         }
-      ]
+      ],
+      "expo-notifications"
     ],
     "ios": {
       "supportsTablet": true,

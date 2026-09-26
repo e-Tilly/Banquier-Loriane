@@ -36,13 +36,34 @@ export function senderFromEnv(): SenderIdentity {
   return required as SenderIdentity;
 }
 
+/** Why this person is hearing from us — CASL wants the basis to be honest, so it varies with it. */
+const WHY = {
+  conspicuous_publication: {
+    fr: "Vous recevez ce message parce que votre adresse est publiée sur votre site web.",
+    en: "You're receiving this because your address is published on your website.",
+  },
+  existing_business_relationship: {
+    fr: "Vous recevez ce message parce que vous gérez une fiche sur Alentour.",
+    en: "You're receiving this because you manage a listing on Alentour.",
+  },
+  express_consent: {
+    fr: "Vous recevez ce message parce que vous avez accepté d'avoir des nouvelles d'Alentour.",
+    en: "You're receiving this because you agreed to hear from Alentour.",
+  },
+} as const;
+
+export function unsubscribeUrl(sender: SenderIdentity, token: string): string {
+  return `${sender.unsubscribeBase.replace(/\/$/, "")}/${token}`;
+}
+
 export function renderEmail(
   draft: DraftedMessage,
   sender: SenderIdentity,
   unsubscribeToken: string,
+  basis: keyof typeof WHY = "conspicuous_publication",
 ): { subject: string; text: string } {
   const fr = draft.locale.startsWith("fr");
-  const url = `${sender.unsubscribeBase.replace(/\/$/, "")}/${unsubscribeToken}`;
+  const url = unsubscribeUrl(sender, unsubscribeToken);
 
   const footer = fr
     ? [
@@ -52,7 +73,7 @@ export function renderEmail(
         "",
         "—",
         `${sender.appName} · ${sender.mailingAddress}`,
-        `Vous recevez ce message parce que votre adresse est publiée sur votre site web.`,
+        WHY[basis].fr,
         `Se désabonner (définitif) : ${url}`,
       ]
     : [
@@ -62,7 +83,7 @@ export function renderEmail(
         "",
         "—",
         `${sender.appName} · ${sender.mailingAddress}`,
-        `You're receiving this because your address is published on your website.`,
+        WHY[basis].en,
         `Unsubscribe (permanent): ${url}`,
       ];
 

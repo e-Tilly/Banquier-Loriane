@@ -21,6 +21,8 @@
  *   npm run admin -- pause-creation on|off      only new outings — flip this before going away
  *   npm run admin -- restrict <user-id> <days>  keep someone out of outings for a while
  *   npm run admin -- reject-submission <activity-id> "why"   a community submission that won't be published
+ *   npm run admin -- outreach                   outreach drafts waiting for your approval, in full
+ *   npm run admin -- outreach-approve <id> | outreach-reject <id>
  */
 import pg from "pg";
 import { approveClaim, rejectClaim } from "../src/claims/claims.ts";
@@ -225,6 +227,30 @@ export async function run(pool: pg.Pool, argv: string[], out: (s: string) => voi
       out(`✓ ${JSON.stringify(s)}`);
       return 0;
     }
+    case "outreach": {
+      const { rows } = await pool.query(
+        `SELECT m.id, m.subject, m.body, m.locale, c.email, v.name AS venue, cr.basis, s.distinct_users, s.saves_count
+           FROM outreach_messages m JOIN business_contacts c ON c.id = m.contact_id
+           JOIN consent_records cr ON cr.id = m.consent_id JOIN demand_signals s ON s.id = m.signal_id
+           JOIN venues v ON v.id = s.venue_id
+          WHERE m.status = 'draft' AND m.verified ORDER BY m.created_at`);
+      if (!rows.length) { out("No outreach drafts waiting."); return 0; }
+      for (const r of rows) {
+        out(`\n${r.id}  ${r.venue} <${r.email}>  [${r.basis}]  ${r.distinct_users} people / ${r.saves_count} saves`);
+        out(`  Subject: ${r.subject}`);
+        out(r.body.split("\n").map((l: string) => `  │ ${l}`).join("\n"));
+      }
+      return 0;
+    }
+    case "outreach-approve":
+    case "outreach-reject": {
+      if (!args[0]) { out(`usage: ${cmd} <message-id>`); return 2; }
+      const r = await pool.query(
+        `UPDATE outreach_messages SET status = $2, reviewed_by = $3, reviewed_at = now() WHERE id = $1 AND status = 'draft'`,
+        [args[0], cmd === "outreach-approve" ? "approved" : "rejected", REVIEWER]);
+      out(r.rowCount ? `✓ ${cmd === "outreach-approve" ? "approved — npm run outreach:send sends it" : "rejected"}` : "not found or not a draft");
+      return r.rowCount ? 0 : 1;
+    }
     case "reject-submission": {
       if (!args[0] || !args[1]) { out('usage: reject-submission <activity-id> "why"'); return 2; }
       const by = await rejectSubmission(pool, args[0], args[1]);
@@ -245,7 +271,7 @@ export async function run(pool: pg.Pool, argv: string[], out: (s: string) => voi
       out("commands: stats | claims | approve <id> | reject <id> \"why\" | reports | resolve <id> actioned|dismissed \"note\"" +
         " | pending | publish <venue-id> | hide <activity-id> | media | media-ok <id> | media-no <id> | jobs | stale" +
         " | outings | unpause <id> | cancel <id> | pause-outings on|off | pause-creation on|off | restrict <user-id> <days>" +
-        " | reject-submission <activity-id> \"why\"");
+        " | reject-submission <activity-id> \"why\" | outreach | outreach-approve <id> | outreach-reject <id>");
       return cmd ? 2 : 0;
   }
 }

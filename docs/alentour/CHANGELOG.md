@@ -1,5 +1,22 @@
 # Changelog
 
+## Implementation — 2026-09-26 — all six stages built
+
+The plan is now code, in [`alentour/`](../../alentour/). Each stage works on its own and is
+switched on by configuration, so the roadmap's gates still decide what goes live when.
+
+| Stage | Built | Notes where the build refined the plan |
+|---|---|---|
+| 1 | Static catalog, on-device filter/rank, shelves, map, lists, FR/EN, hourly weather file | Weather is one call per city per hour, published next to the catalog — the app never calls a weather API. |
+| 2 | Hono API, email codes + Apple/Google, synced library, export, deletion | Opaque hashed sessions instead of JWTs, because deletion must revoke immediately. Library sync is per-entry last-writer-wins with tombstones. |
+| 3 | Claims (instant at the website's domain, manual otherwise), owner web pages, admin CLI | A claim records an existing-business-relationship consent for the outreach agent. |
+| 4 | Enrichment pipeline, self-serve onboarding, photos, Batch seeding, freshness loop | A mechanical gate between model and person: verbatim quotes, numbers in quotes, parseable hours. Seeded listings carry facts only — no generated prose. |
+| 5 | Venue sessions, rallies, concierge, chat, blocks, phone, push, pause switches | The concierge has no user row, so "never an attendee" is enforced by the schema. Rallies need two other possible yes-voters before they start. |
+| 6 | Community additions with trust gating, accuracy loop, Business Pro via Stripe | New places always wait for review regardless of trust; free vs Pro limits (6 vs 30 photos, sessions, booking link, weekly stats). |
+| — | Outreach: human approval, sending, CASL unsubscribe | Footer states the real consent basis; quiet hours computed in Montréal time; RFC 8058 one-click unsubscribe. |
+
+Deployment and the daily routine: [15 — Deploy & operate](15-deploy-and-operate.md).
+
 ## v2 — 2026-09-22 — Rescoped for a solo, unfunded, part-time build
 
 Ten questions answered. Seven changed the plan; two changed it fundamentally.

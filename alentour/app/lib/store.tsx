@@ -19,6 +19,7 @@ import { loadCatalog, loadWeather } from "./catalog.ts";
 import { api, apiEnabled, loadToken, saveToken, type ApiUser } from "./api.ts";
 import { deviceLang, localeOf, translate, type Key, type Lang } from "./i18n.ts";
 import { config } from "./config.ts";
+import { registerForPush } from "./push.ts";
 
 /** Montréal, Plateau. Used until (or unless) the user grants location. */
 export const FALLBACK_POSITION = { lat: 45.523, lon: -73.58 };
@@ -251,6 +252,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const data = await api<unknown>("GET", "/v1/me/export", undefined, account.token);
     return JSON.stringify(data, null, 2);
   }, [account]);
+
+  // Ask for notifications once signed in — outings need reminders; the dictionary doesn't.
+  useEffect(() => { if (account) void registerForPush(account.token); }, [account?.token]);
 
   const updateProfile = useCallback(async (patch: { displayName?: string | null; birthYear?: number }) => {
     if (!account) return;

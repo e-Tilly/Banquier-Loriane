@@ -104,6 +104,18 @@ export function validateConsent(c: ConsentRecord, now: Date): GateRefusal | null
   }
 }
 
+/**
+ * A Date whose local getters read the wall clock in `tz`. The gate checks quiet hours with
+ * getDay()/getHours(), which use the PROCESS's zone — UTC on a server, where 9:00 in Montréal
+ * reads as 13:00. Always pass this as `localNow`.
+ */
+export function venueLocalNow(now: Date, tz: string): Date {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  }).formatToParts(now).map((x) => [x.type, x.value]));
+  return new Date(+p.year!, +p.month! - 1, +p.day!, +p.hour! % 24, +p.minute!);
+}
+
 export function withinSendWindow(localNow: Date): boolean {
   const { startHour, endHour, weekdaysOnly } = RULES.sendWindow;
   const day = localNow.getDay();
