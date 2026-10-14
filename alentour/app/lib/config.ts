@@ -17,6 +17,8 @@ export const config = {
   apiUrl: clean(process.env.EXPO_PUBLIC_API_URL),
   /** A MapLibre style JSON (e.g. Protomaps on R2). Absent: markers on a plain canvas. */
   mapStyleUrl: clean(process.env.EXPO_PUBLIC_MAP_STYLE_URL),
+  /** Hosted preview: the API is replaced by an in-browser stand-in (lib/demoApi.ts). */
+  demo: process.env.EXPO_PUBLIC_DEMO === "1",
   city: "montreal",
   /** Where "Report a problem" goes when there is no API yet. */
   supportEmail: clean(process.env.EXPO_PUBLIC_SUPPORT_EMAIL) ?? "allo@alentour.app",

@@ -134,3 +134,15 @@ sign-in, sync, claims, onboarding with a stubbed model, seeding and Batch mode, 
 races for the last spot, blocks, auto-pause, the reminder clock, community additions, Stripe,
 outreach sending and unsubscribe. CI runs all of it on every push
 (`.github/workflows/alentour-ci.yml`), plus both typechecks and a web build of the app.
+
+## Hosted preview (no backend)
+
+`app/lib/demoApi.ts` replaces the API with an in-browser stand-in when `EXPO_PUBLIC_DEMO=1`, so the
+whole app can be tried from a single static page. Fictional data, kept in the browser only.
+
+```bash
+npm run catalog:export && npm run dev:weather -- --rain
+cd app && EXPO_PUBLIC_DEMO=1 EXPO_PUBLIC_API_URL=demo://app EXPO_PUBLIC_CDN_URL=/ \
+  npx expo export --clear --platform web --output-dir /tmp/demo-web
+python3 -I ../scripts/pack-preview.py /tmp/demo-web /tmp/hosted ../out   # → /tmp/hosted/index.html
+```

@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useRouter } from "expo-router";
 import { buildShelves, buildFeed, shelfItemIds } from "@core/catalog/shelves.ts";
+import { config } from "../lib/config.ts";
 import { useStore } from "../lib/store.tsx";
 import { usePalette, space, radius, typography, type Palette } from "../lib/theme.ts";
 import { ActivityCard } from "../components/ActivityCard.tsx";
@@ -78,6 +79,10 @@ export default function Home() {
               </View>
             </View>
 
+            {config.demo ? (
+              <View style={s.demoBanner} accessibilityRole="text"><Text style={s.demoText}>{t("demo.banner")}</Text></View>
+            ) : null}
+
             {weatherNote ? (
               <View style={s.weather} accessibilityRole="text">
                 <Text style={s.weatherText}>{t(weatherNote)}</Text>
@@ -135,6 +140,8 @@ function IconLink({ p, href, glyph, label }: { p: Palette; href: "/map" | "/save
 
 const styles = (p: Palette) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: p.bg },
+  demoBanner: { backgroundColor: p.warmSoft, borderRadius: radius.md, padding: space.md, marginHorizontal: space.lg },
+  demoText: { ...typography.small, color: p.warm },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.sm, padding: space.xl, backgroundColor: p.bg },
   errorTitle: { ...typography.title, color: p.ink },
   errorBody: { ...typography.body, color: p.ink3, textAlign: "center" },

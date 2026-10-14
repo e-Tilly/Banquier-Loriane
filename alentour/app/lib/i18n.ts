@@ -222,6 +222,8 @@ const dict = {
   "error.network": { fr: "Pas de connexion. Réessaie.", en: "No connection. Try again." },
   "error.generic": { fr: "Quelque chose a mal tourné. Réessaie.", en: "Something went wrong. Try again." },
 
+  // demo preview
+  "demo.banner": { fr: "Démo : données fictives, gardées seulement dans ce navigateur. N'importe quel code à 6 chiffres fonctionne.", en: "Demo: fictional data, kept only in this browser. Any 6-digit code works." },
   // community (Stage 6)
   "nav.add": { fr: "Ajouter une activité", en: "Add an activity" },
   "add.intro": {

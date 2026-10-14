@@ -9,6 +9,7 @@ import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { config } from "./config.ts";
+import { demoApi } from "./demoApi.ts";
 
 const TOKEN_KEY = "alentour.session";
 
@@ -60,6 +61,7 @@ export async function api<T>(
   token?: string | null,
 ): Promise<T> {
   if (!config.apiUrl) throw new ApiError(0, "api_disabled");
+  if (config.demo) return (await demoApi(method, path, body)) as T;
   let res: Response;
   try {
     res = await fetch(`${config.apiUrl}${path}`, {
