@@ -9,6 +9,7 @@ export type Lang = "fr" | "en";
 
 const dict = {
   // navigation
+  "nav.home": { fr: "Accueil", en: "Home" },
   "nav.explore": { fr: "Explorer", en: "Explore" },
   "nav.saved": { fr: "Enregistrés", en: "Saved" },
   "nav.map": { fr: "Carte", en: "Map" },
@@ -22,6 +23,8 @@ const dict = {
   "home.title": { fr: "Quoi faire proche", en: "What to do nearby" },
   "home.locate": { fr: "Montrer ce qui est vraiment proche de moi", en: "Show what's actually near me" },
   "home.approx": { fr: "Position approximative : Plateau", en: "Approximate: Plateau" },
+  "home.pick": { fr: "Choisis ta prochaine sortie", en: "Pick your next outing" },
+  "home.all": { fr: "Tout", en: "All" },
   "home.search": { fr: "Chercher et filtrer", en: "Search and filter" },
   "home.everything": { fr: "Tout ce qu'il y a autour", en: "Everything around you" },
   "home.rainNote": { fr: "Pluie prévue — l'intérieur passe en premier.", en: "Rain expected — indoor goes first." },
@@ -36,6 +39,7 @@ const dict = {
   // cards and facts
   "card.free": { fr: "Gratuit", en: "Free" },
   "card.from": { fr: "dès", en: "from" },
+  "card.seeMore": { fr: "Voir plus", en: "See more" },
   "card.open": { fr: "Ouvert", en: "Open" },
   "card.closed": { fr: "Fermé", en: "Closed" },
   "card.hoursUnknown": { fr: "Horaire inconnu", en: "Hours unknown" },
@@ -101,6 +105,8 @@ const dict = {
   "detail.duration": { fr: "Durée", en: "Duration" },
   "detail.distance": { fr: "Distance", en: "Distance" },
   "detail.effort": { fr: "Effort", en: "Effort" },
+  "detail.readMore": { fr: "Lire la suite", en: "Read more" },
+  "detail.readLess": { fr: "Réduire", en: "Show less" },
   "detail.about": { fr: "À propos", en: "About" },
   "detail.bring": { fr: "Quoi apporter", en: "What to bring" },
   "detail.hours": { fr: "Horaire", en: "Hours" },
@@ -223,7 +229,7 @@ const dict = {
   "error.generic": { fr: "Quelque chose a mal tourné. Réessaie.", en: "Something went wrong. Try again." },
 
   // demo preview
-  "demo.banner": { fr: "Démo : données fictives, gardées seulement dans ce navigateur. N'importe quel code à 6 chiffres fonctionne.", en: "Demo: fictional data, kept only in this browser. Any 6-digit code works." },
+  "demo.banner": { fr: "Démo : données fictives. N'importe quel code à 6 chiffres fonctionne.", en: "Demo: fictional data. Any 6-digit code works." },
   // community (Stage 6)
   "nav.add": { fr: "Ajouter une activité", en: "Add an activity" },
   "add.intro": {

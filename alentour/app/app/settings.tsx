@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Platform, Share } from "react-native";
 import { Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { NavBar, NAV_SPACE } from "../components/NavBar.tsx";
 import Constants from "expo-constants";
 import { useStore } from "../lib/store.tsx";
 import { usePalette, space, radius, typography, type Palette } from "../lib/theme.ts";
@@ -123,6 +124,7 @@ export default function Settings() {
 
         <Text style={s.version}>{t("settings.version", { v: Constants.expoConfig?.version ?? "dev" })}</Text>
       </ScrollView>
+      <NavBar active={null} />
     </SafeAreaView>
   );
 }
@@ -139,7 +141,7 @@ function Group({ p, title, children }: { p: Palette; title: string; children: Re
 
 const styles = (p: Palette) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: p.bg },
-  content: { padding: space.lg, gap: space.xl, paddingBottom: space.xxl },
+  content: { padding: space.lg, gap: space.xl, paddingBottom: NAV_SPACE + space.xl },
   group: { gap: space.sm },
   groupTitle: { ...typography.micro, color: p.ink3, textTransform: "uppercase" },
   card: {

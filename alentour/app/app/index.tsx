@@ -5,7 +5,7 @@
  */
 import React, { useMemo, useState } from "react";
 import {
-  View, Text, ScrollView, FlatList, Pressable, ActivityIndicator, StyleSheet, RefreshControl,
+  View, Text, ScrollView, FlatList, Pressable, ActivityIndicator, StyleSheet, RefreshControl, useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useRouter } from "expo-router";
@@ -14,23 +14,37 @@ import { config } from "../lib/config.ts";
 import { useStore } from "../lib/store.tsx";
 import { usePalette, space, radius, typography, type Palette } from "../lib/theme.ts";
 import { ActivityCard } from "../components/ActivityCard.tsx";
+import { HeroCard } from "../components/HeroCard.tsx";
+import { NavBar, NAV_SPACE } from "../components/NavBar.tsx";
+import { Icon } from "../components/Icon.tsx";
 import type { Key } from "../lib/i18n.ts";
 
 export default function Home() {
   const p = usePalette();
   const s = styles(p);
   const router = useRouter();
+  const { width: screenW } = useWindowDimensions();
   const {
     catalog, loading, error, lang, t, rankContext, isSaved, toggleSave, conditions,
-    hasPreciseLocation, requestLocation, apiEnabled,
+    hasPreciseLocation, requestLocation, apiEnabled, account,
   } = useStore();
   const [refreshing, setRefreshing] = useState(false);
+  const [cat, setCat] = useState<string | null>(null);
 
-  const shelves = useMemo(() => (catalog ? buildShelves(catalog, rankContext) : []), [catalog, rankContext]);
-  const feed = useMemo(
-    () => (catalog ? buildFeed(catalog, rankContext, { maxDistanceKm: 15 }, 40, shelfItemIds(shelves)) : []),
-    [catalog, rankContext, shelves],
+  const heroW = Math.min(Math.round(screenW * 0.78), 340);
+  const categories = useMemo(
+    () => Object.entries(catalog?.tagLabels ?? {}).filter(([k]) => k.startsWith("category.") && catalog?.activities.some((a) => a.cat === k)),
+    [catalog]);
+  const heroes = useMemo(
+    () => (catalog ? buildFeed(catalog, rankContext, { maxDistanceKm: 15, ...(cat ? { categories: [cat] } : {}) }, 6, new Set()) : []),
+    [catalog, rankContext, cat],
   );
+  const shelves = useMemo(() => (catalog ? buildShelves(catalog, rankContext) : []), [catalog, rankContext]);
+  const feed = useMemo(() => {
+    if (!catalog) return [];
+    const taken = new Set([...shelfItemIds(shelves), ...heroes.map((h) => h.activity.id)]);
+    return buildFeed(catalog, rankContext, { maxDistanceKm: 15 }, 40, taken);
+  }, [catalog, rankContext, shelves, heroes]);
 
   const weatherNote: Key | null = !conditions.fresh ? null
     : conditions.precipitationProb > 0.5 ? "home.rainNote"
@@ -39,7 +53,7 @@ export default function Home() {
     : null;
 
   if (loading) {
-    return <SafeAreaView style={s.center}><ActivityIndicator color={p.accent} /></SafeAreaView>;
+    return <SafeAreaView style={s.center}><ActivityIndicator color={p.ink} /></SafeAreaView>;
   }
   if (error || !catalog) {
     return (
@@ -52,6 +66,7 @@ export default function Home() {
 
   const h = rankContext.now.getHours();
   const kicker = t(h < 12 ? "home.morning" : h < 17 ? "home.afternoon" : "home.evening");
+  const initial = (account?.user.displayName ?? account?.user.email ?? "")[0]?.toUpperCase();
 
   return (
     <SafeAreaView style={s.screen} edges={["top"]}>
@@ -67,42 +82,64 @@ export default function Home() {
           <View style={s.header}>
             <View style={s.titleRow}>
               <View style={{ flex: 1 }}>
-                <Text style={s.kicker}>{kicker}</Text>
                 <Text style={s.title}>{t("home.title")}</Text>
+                <Text style={s.kicker}>{kicker}</Text>
               </View>
-              <View style={s.iconRow}>
-                <IconLink p={p} href="/map" glyph="◎" label={t("nav.map")} />
-                <IconLink p={p} href="/saved" glyph="★" label={t("nav.saved")} />
-                {apiEnabled ? <IconLink p={p} href="/outings" glyph="⚑" label={t("nav.outings")} /> : null}
-                {apiEnabled ? <IconLink p={p} href="/add" glyph="＋" label={t("nav.add")} /> : null}
-                <IconLink p={p} href="/settings" glyph="⚙" label={t("nav.settings")} />
-              </View>
+              {apiEnabled ? (
+                <Link href="/add" asChild>
+                  <Pressable style={s.circle} accessibilityRole="button" accessibilityLabel={t("nav.add")}>
+                    <Icon name="plus" size={22} color={p.ink} />
+                  </Pressable>
+                </Link>
+              ) : null}
+              <Link href="/settings" asChild>
+                <Pressable style={StyleSheet.flatten([s.circle, s.avatar])} accessibilityRole="button" accessibilityLabel={t("nav.settings")}>
+                  {initial ? <Text style={s.avatarText}>{initial}</Text> : <Icon name="user" size={22} color={p.onAccent} />}
+                </Pressable>
+              </Link>
             </View>
 
             {config.demo ? (
-              <View style={s.demoBanner} accessibilityRole="text"><Text style={s.demoText}>{t("demo.banner")}</Text></View>
+              <View style={s.note} accessibilityRole="text"><Text style={s.noteText}>{t("demo.banner")}</Text></View>
+            ) : null}
+            {weatherNote ? (
+              <View style={s.note} accessibilityRole="text"><Text style={s.noteText}>{t(weatherNote)}</Text></View>
             ) : null}
 
-            {weatherNote ? (
-              <View style={s.weather} accessibilityRole="text">
-                <Text style={s.weatherText}>{t(weatherNote)}</Text>
-              </View>
-            ) : null}
+            <Pressable style={s.search} onPress={() => router.push("/browse")} accessibilityRole="search">
+              <Icon name="search" size={20} color={p.ink3} />
+              <Text style={s.searchText}>{t("home.search")}</Text>
+              <View style={s.searchGo}><Icon name="sliders" size={20} color={p.onAccent} /></View>
+            </Pressable>
 
             {!hasPreciseLocation ? (
-              <Pressable style={s.locBanner} onPress={requestLocation} accessibilityRole="button">
-                <Text style={s.locText}>{t("home.locate")}</Text>
-                <Text style={s.locHint}>{t("home.approx")}</Text>
+              <Pressable style={s.loc} onPress={requestLocation} accessibilityRole="button">
+                <Icon name="pin" size={18} color={p.ink2} />
+                <Text style={s.locText} numberOfLines={1}>{t("home.locate")}</Text>
               </Pressable>
             ) : null}
 
-            <Pressable style={s.searchBtn} onPress={() => router.push("/browse")} accessibilityRole="search">
-              <Text style={s.searchText}>{t("home.search")}</Text>
-            </Pressable>
+            <Text style={s.section}>{t("home.pick")}</Text>
+            <View style={s.chipsWrap}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
+                <Chip p={p} label={t("home.all")} on={cat === null} onPress={() => setCat(null)} />
+                {categories.map(([slug, label]) => (
+                  <Chip key={slug} p={p} label={label} on={cat === slug} onPress={() => setCat(cat === slug ? null : slug)} />
+                ))}
+              </ScrollView>
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={heroW + space.md} decelerationRate="fast"
+              contentContainerStyle={s.heroRow}>
+              {heroes.map((item) => (
+                <HeroCard key={item.activity.id} item={item} lang={lang} width={heroW}
+                  saved={isSaved(item.activity.id)} onToggleSave={toggleSave} />
+              ))}
+            </ScrollView>
 
             {shelves.map((shelf) => (
               <View key={shelf.key} style={s.shelf}>
-                <Text style={s.shelfTitle}>{shelf.label}</Text>
+                <Text style={s.section}>{shelf.label}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.shelfRow}>
                   {shelf.items.map((item) => (
                     <View key={item.activity.id} style={s.shelfCard}>
@@ -114,7 +151,7 @@ export default function Home() {
               </View>
             ))}
 
-            <Text style={s.feedTitle}>{t("home.everything")}</Text>
+            <Text style={s.section}>{t("home.everything")}</Text>
           </View>
         }
         renderItem={({ item }) => (
@@ -123,49 +160,54 @@ export default function Home() {
           </View>
         )}
       />
+      <NavBar active="home" />
     </SafeAreaView>
   );
 }
 
-function IconLink({ p, href, glyph, label }: { p: Palette; href: "/map" | "/saved" | "/settings" | "/outings" | "/add"; glyph: string; label: string }) {
+function Chip({ p, label, on, onPress }: { p: Palette; label: string; on: boolean; onPress: () => void }) {
+  const s = styles(p);
   return (
-    <Link href={href} asChild>
-      <Pressable hitSlop={8} accessibilityRole="button" accessibilityLabel={label}
-        style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ fontSize: 22, color: p.accent }}>{glyph}</Text>
-      </Pressable>
-    </Link>
+    <Pressable onPress={onPress} style={[s.chip, on && s.chipOn]} accessibilityRole="button" accessibilityState={{ selected: on }}>
+      <Text style={[s.chipText, on && s.chipTextOn]}>{label}</Text>
+    </Pressable>
   );
 }
 
 const styles = (p: Palette) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: p.bg },
-  demoBanner: { backgroundColor: p.warmSoft, borderRadius: radius.md, padding: space.md, marginHorizontal: space.lg },
-  demoText: { ...typography.small, color: p.warm },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.sm, padding: space.xl, backgroundColor: p.bg },
   errorTitle: { ...typography.title, color: p.ink },
   errorBody: { ...typography.body, color: p.ink3, textAlign: "center" },
-  list: { paddingBottom: space.xxl },
-  header: { gap: space.lg },
-  titleRow: { flexDirection: "row", alignItems: "flex-start", paddingHorizontal: space.lg, paddingTop: space.sm },
-  kicker: { ...typography.micro, color: p.accent, textTransform: "uppercase" },
-  title: { ...typography.display, color: p.ink, marginTop: 2 },
-  iconRow: { flexDirection: "row", gap: 2 },
-  weather: { marginHorizontal: space.lg, paddingVertical: space.sm, paddingHorizontal: space.md, borderRadius: radius.md, backgroundColor: p.warmSoft },
-  weatherText: { ...typography.small, color: p.warm, fontWeight: "600" },
-  locBanner: { marginHorizontal: space.lg, padding: space.md, borderRadius: radius.md, backgroundColor: p.accentSoft, gap: 2 },
-  locText: { ...typography.small, color: p.accent, fontWeight: "600" },
-  locHint: { ...typography.micro, color: p.ink3 },
-  searchBtn: {
-    marginHorizontal: space.lg, paddingVertical: 12, paddingHorizontal: space.md,
-    borderRadius: radius.md, backgroundColor: p.surface,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule,
+  list: { paddingBottom: NAV_SPACE + space.xl },
+  header: { gap: space.md + 2 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.sm },
+  title: { ...typography.display, color: p.ink },
+  kicker: { ...typography.body, color: p.ink3, marginTop: 2 },
+  circle: { width: 46, height: 46, borderRadius: 23, backgroundColor: p.surface, alignItems: "center", justifyContent: "center" },
+  avatar: { backgroundColor: p.accent },
+  avatarText: { ...typography.heading, color: p.onAccent },
+  note: { marginHorizontal: space.lg, paddingVertical: 9, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: p.warmSoft },
+  noteText: { ...typography.small, color: p.warm, fontWeight: "500", textAlign: "center" },
+  search: {
+    marginHorizontal: space.lg, height: 58, borderRadius: radius.pill, backgroundColor: p.surface,
+    flexDirection: "row", alignItems: "center", gap: space.sm, paddingLeft: space.lg, paddingRight: 8,
   },
-  searchText: { ...typography.body, color: p.ink3 },
-  shelf: { gap: space.sm },
-  shelfTitle: { ...typography.title, color: p.ink, paddingHorizontal: space.lg },
+  searchText: { ...typography.body, color: p.ink3, flex: 1 },
+  searchGo: { width: 46, height: 46, borderRadius: 23, backgroundColor: p.accent, alignItems: "center", justifyContent: "center" },
+  loc: { marginHorizontal: space.lg, paddingVertical: 10, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: p.surface, flexDirection: "row", gap: space.sm, alignItems: "center" },
+  locText: { ...typography.small, color: p.ink, fontWeight: "600", flex: 1 },
+  locHint: { ...typography.micro, color: p.ink3 },
+  section: { ...typography.title, color: p.ink, paddingHorizontal: space.lg },
+  chipsWrap: { height: 48, flexGrow: 0, flexShrink: 0, marginTop: -space.sm },
+  chips: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.lg },
+  chip: { paddingHorizontal: 18, height: 42, borderRadius: radius.pill, backgroundColor: p.surface, alignItems: "center", justifyContent: "center" },
+  chipOn: { backgroundColor: p.accent },
+  chipText: { ...typography.body, color: p.ink2, fontWeight: "500" },
+  chipTextOn: { color: p.onAccent, fontWeight: "600" },
+  heroRow: { paddingHorizontal: space.lg, gap: space.md },
+  shelf: { gap: space.md },
   shelfRow: { paddingHorizontal: space.lg, gap: space.md },
-  shelfCard: { width: 280 },
-  feedTitle: { ...typography.title, color: p.ink, paddingHorizontal: space.lg, marginTop: space.sm },
+  shelfCard: { width: 250 },
   cardWrap: { paddingHorizontal: space.lg, paddingTop: space.md },
 });

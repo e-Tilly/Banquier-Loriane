@@ -9,6 +9,7 @@ import { ActivityCard } from "../components/ActivityCard.tsx";
 import { FilterBar } from "../components/FilterBar.tsx";
 import { FilterSheet } from "../components/FilterSheet.tsx";
 import { ActivityMap, mapAvailable } from "../components/ActivityMap";
+import { NavBar, NAV_SPACE } from "../components/NavBar.tsx";
 
 export default function MapScreen() {
   const p = usePalette();
@@ -28,7 +29,8 @@ export default function MapScreen() {
   if (!catalog) return <SafeAreaView style={s.screen} />;
 
   return (
-    <SafeAreaView style={s.screen} edges={["bottom"]}>
+    <SafeAreaView style={s.screen} edges={["top"]}>
+      <Text style={s.heading}>{t("nav.map")}</Text>
       <FilterBar filters={filters} onChange={setFilters} onOpenSheet={() => setSheetOpen(true)} lang={lang} />
 
       {mapAvailable ? (
@@ -60,6 +62,7 @@ export default function MapScreen() {
         />
       )}
 
+      <NavBar active="map" />
       <FilterSheet visible={sheetOpen} onClose={() => setSheetOpen(false)}
         catalog={catalog} filters={filters} onChange={setFilters} ctx={rankContext} lang={lang} />
     </SafeAreaView>
@@ -68,9 +71,10 @@ export default function MapScreen() {
 
 const styles = (p: Palette) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: p.bg },
-  mapWrap: { flex: 1, position: "relative", overflow: "hidden" },
-  selected: { position: "absolute", left: space.lg, right: space.lg, bottom: space.lg },
-  list: { paddingBottom: space.xxl },
+  mapWrap: { flex: 1, position: "relative", overflow: "hidden", marginHorizontal: space.lg, marginBottom: NAV_SPACE - 8, borderRadius: radius.xl },
+  heading: { ...typography.display, color: p.ink, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.sm },
+  selected: { position: "absolute", left: space.sm, right: space.sm, bottom: space.sm },
+  list: { paddingBottom: NAV_SPACE + space.xl },
   cardWrap: { paddingHorizontal: space.lg, paddingTop: space.md },
   fallback: { margin: space.lg, padding: space.md, borderRadius: radius.md, backgroundColor: p.warmSoft, gap: 4 },
   fallbackTitle: { ...typography.heading, color: p.warm },

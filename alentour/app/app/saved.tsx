@@ -8,6 +8,7 @@ import { savedIds, visibleLists } from "@core/user/library.ts";
 import { useStore } from "../lib/store.tsx";
 import { usePalette, space, radius, typography, type Palette } from "../lib/theme.ts";
 import { ActivityCard } from "../components/ActivityCard.tsx";
+import { NavBar, NAV_SPACE } from "../components/NavBar.tsx";
 
 export default function Saved() {
   const p = usePalette();
@@ -41,7 +42,8 @@ export default function Saved() {
   };
 
   return (
-    <SafeAreaView style={s.screen} edges={["bottom"]}>
+    <SafeAreaView style={s.screen} edges={["top"]}>
+      <Text style={s.heading}>{t("nav.saved")}</Text>
       {lists.length > 0 ? (
         <View style={s.tabsWrap}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs}>
@@ -77,6 +79,7 @@ export default function Saved() {
           ) : null}
         />
       )}
+      <NavBar active="saved" />
     </SafeAreaView>
   );
 }
@@ -98,13 +101,13 @@ const styles = (p: Palette) => StyleSheet.create({
   tabsWrap: { height: 52, flexGrow: 0, flexShrink: 0 },
   tabs: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.lg },
   tab: {
-    paddingHorizontal: space.md, paddingVertical: 7, borderRadius: radius.pill,
-    backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule,
+    paddingHorizontal: 18, height: 42, justifyContent: "center", borderRadius: radius.pill, backgroundColor: p.surface,
   },
-  tabActive: { backgroundColor: p.accent, borderColor: p.accent },
-  tabText: { ...typography.small, color: p.ink2 },
+  tabActive: { backgroundColor: p.accent },
+  tabText: { ...typography.body, color: p.ink2, fontWeight: "500" },
   tabTextActive: { color: p.onAccent, fontWeight: "600" },
-  list: { paddingBottom: space.xxl },
+  heading: { ...typography.display, color: p.ink, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.sm },
+  list: { paddingBottom: NAV_SPACE + space.xl },
   cardWrap: { paddingHorizontal: space.lg, paddingTop: space.md },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.sm, padding: space.xl },
   emptyTitle: { ...typography.title, color: p.ink },

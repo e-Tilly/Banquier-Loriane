@@ -14,6 +14,7 @@ import { ApiError } from "../../lib/api.ts";
 import { outingsApi, type Answer, type ChatMessage, type OutingDetail } from "../../lib/outings.ts";
 import { usePalette, space, radius, typography, type Palette } from "../../lib/theme.ts";
 import { formatWhen } from "../../lib/format.ts";
+import { Icon } from "../../components/Icon.tsx";
 import type { Key } from "../../lib/i18n.ts";
 
 const KNOWN = new Set(["ineligible", "paused", "full", "closed", "rate_limited", "contact_details", "network"]);
@@ -106,9 +107,13 @@ export default function OutingScreen() {
   };
 
   return (
-    <SafeAreaView style={s.screen} edges={["bottom"]}>
+    <SafeAreaView style={s.screen} edges={["top", "bottom"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={s.content}>
+          <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace("/outings"))} accessibilityRole="button"
+            accessibilityLabel={t("nav.back")} style={s.back}>
+            <Icon name="arrow-left" size={22} color={p.ink} />
+          </Pressable>
           <Text style={s.kicker}>{t(o.mode === "rally" && o.organizer === "user" ? "outings.mode.rally_user" : `outings.mode.${o.mode}`)}</Text>
           <Text style={s.title}>{activity?.title ?? ""}</Text>
           <Text style={s.body}>{o.venue.name}{o.venue.address ? ` · ${o.venue.address}` : ""}</Text>
@@ -207,6 +212,7 @@ const styles = (p: Palette) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: p.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xl, backgroundColor: p.bg },
   content: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
+  back: { width: 46, height: 46, borderRadius: 23, backgroundColor: p.surface, alignItems: "center", justifyContent: "center" },
   kicker: { ...typography.micro, color: p.accent, textTransform: "uppercase" },
   title: { ...typography.display, color: p.ink },
   when: { ...typography.heading, color: p.ink },

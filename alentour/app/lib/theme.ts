@@ -1,19 +1,24 @@
-/** Design tokens. Montréal, 18-30, outdoors-adjacent: a pine accent on green-biased
- *  neutrals, with warm signal colours reserved for price and effort. */
+/** Design tokens. Soft grey ground, white cards with large radii, and ONE strong move: near-black
+ *  pills for everything that acts (primary buttons, the active chip, the floating nav). Colour comes
+ *  from the content's own artwork or photo, not from the chrome. */
 import { useColorScheme } from "react-native";
 
 const light = {
-  bg: "#F4F6F3", surface: "#FFFFFF", surfaceAlt: "#EAEEE9",
-  ink: "#151A18", ink2: "#3C443F", ink3: "#6B746F", ink4: "#98A09B",
-  rule: "#DCE2DD", accent: "#1F5F4B", accentSoft: "#E2EEE8", onAccent: "#FFFFFF",
-  warm: "#8F5E16", warmSoft: "#F5EDDD", danger: "#93372A",
+  bg: "#F5F5F4", surface: "#FFFFFF", surfaceAlt: "#ECEDEC",
+  ink: "#1B1F22", ink2: "#3A4146", ink3: "#70777C", ink4: "#A3A9AD",
+  rule: "#E4E6E6", accent: "#1F2326", accentSoft: "#ECEDED", onAccent: "#FFFFFF",
+  brand: "#1F5F4B", brandSoft: "#E3EFE9",
+  warm: "#8F5E16", warmSoft: "#F5EDDD", danger: "#B03A2E",
+  navBg: "#1F2326", navFg: "#9AA1A5", navActiveBg: "#FFFFFF", navActiveFg: "#1F2326",
 };
 
 const dark: typeof light = {
-  bg: "#121614", surface: "#1A201D", surfaceAlt: "#222926",
-  ink: "#E9EDEA", ink2: "#C2CAC5", ink3: "#8E9791", ink4: "#6D766F",
-  rule: "#2D3532", accent: "#79C3A6", accentSoft: "#17302A", onAccent: "#0E1513",
-  warm: "#D7A45C", warmSoft: "#2E2517", danger: "#D98B7A",
+  bg: "#0F1112", surface: "#1A1D1F", surfaceAlt: "#25292B",
+  ink: "#F0F2F2", ink2: "#CBD0D2", ink3: "#8D9599", ink4: "#656C70",
+  rule: "#2B3033", accent: "#F0F2F2", accentSoft: "#25292B", onAccent: "#111314",
+  brand: "#79C3A6", brandSoft: "#17302A",
+  warm: "#D7A45C", warmSoft: "#2E2517", danger: "#E0948A",
+  navBg: "#26292B", navFg: "#8D9599", navActiveBg: "#F0F2F2", navActiveFg: "#111314",
 };
 
 export type Palette = typeof light;
@@ -23,10 +28,10 @@ export function usePalette(): Palette {
 }
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
-export const radius = { sm: 6, md: 10, lg: 16, pill: 999 };
+export const radius = { sm: 8, md: 14, lg: 22, xl: 30, pill: 999 };
 export const typography = {
-  display: { fontSize: 28, fontWeight: "700" as const, letterSpacing: -0.5 },
-  title: { fontSize: 20, fontWeight: "700" as const, letterSpacing: -0.3 },
+  display: { fontSize: 30, fontWeight: "600" as const, letterSpacing: -0.8 },
+  title: { fontSize: 21, fontWeight: "600" as const, letterSpacing: -0.4 },
   heading: { fontSize: 17, fontWeight: "600" as const },
   body: { fontSize: 15, fontWeight: "400" as const },
   small: { fontSize: 13, fontWeight: "400" as const },

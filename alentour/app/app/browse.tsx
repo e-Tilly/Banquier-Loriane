@@ -1,6 +1,6 @@
 /** Filtered list. The "never show zero" promise lives here. */
 import React, { useMemo, useState } from "react";
-import { View, Text, FlatList, TextInput, StyleSheet } from "react-native";
+import { View, Text, FlatList, TextInput, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { applyFilters, diversify } from "@core/catalog/filter.ts";
 import { useStore } from "../lib/store.tsx";
@@ -8,6 +8,8 @@ import { usePalette, space, radius, typography, type Palette } from "../lib/them
 import { ActivityCard } from "../components/ActivityCard.tsx";
 import { FilterBar } from "../components/FilterBar.tsx";
 import { FilterSheet } from "../components/FilterSheet.tsx";
+import { NavBar, NAV_SPACE } from "../components/NavBar.tsx";
+import { Icon } from "../components/Icon.tsx";
 import type { Key } from "../lib/i18n.ts";
 
 export default function Browse() {
@@ -31,14 +33,19 @@ export default function Browse() {
     .join(t("browse.and"));
 
   return (
-    <SafeAreaView style={s.screen} edges={["bottom"]}>
+    <SafeAreaView style={s.screen} edges={["top"]}>
+      <Text style={s.heading}>{t("nav.explore")}</Text>
       <View style={s.searchRow}>
+        <Icon name="search" size={20} color={p.ink3} />
         <TextInput
           value={query} onChangeText={setQuery}
           placeholder={t("browse.search")} placeholderTextColor={p.ink4}
           style={s.input} returnKeyType="search" clearButtonMode="while-editing"
           accessibilityLabel={t("browse.search")}
         />
+        <Pressable style={s.filterBtn} onPress={() => setSheetOpen(true)} accessibilityRole="button" accessibilityLabel={t("chip.filters")}>
+          <Icon name="sliders" size={20} color={p.onAccent} />
+        </Pressable>
       </View>
 
       <FilterBar filters={filters} onChange={setFilters} onOpenSheet={() => setSheetOpen(true)} lang={lang} />
@@ -84,6 +91,7 @@ export default function Browse() {
         }
       />
 
+      <NavBar active="explore" />
       <FilterSheet visible={sheetOpen} onClose={() => setSheetOpen(false)}
         catalog={catalog} filters={filters} onChange={setFilters} ctx={rankContext} lang={lang} />
     </SafeAreaView>
@@ -92,13 +100,14 @@ export default function Browse() {
 
 const styles = (p: Palette) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: p.bg },
-  searchRow: { paddingHorizontal: space.lg, paddingTop: space.sm },
-  input: {
-    backgroundColor: p.surface, borderRadius: radius.md, paddingHorizontal: space.md,
-    paddingVertical: 11, ...typography.body, color: p.ink,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule, minHeight: 44,
+  heading: { ...typography.display, color: p.ink, paddingHorizontal: space.lg, paddingTop: space.sm },
+  searchRow: {
+    marginHorizontal: space.lg, marginVertical: space.md, height: 60, borderRadius: radius.pill, backgroundColor: p.surface,
+    flexDirection: "row", alignItems: "center", gap: space.sm, paddingLeft: space.lg, paddingRight: 8,
   },
-  list: { paddingBottom: space.xxl },
+  input: { flex: 1, ...typography.body, color: p.ink, height: 44, outlineStyle: "none" } as never,
+  filterBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: p.accent, alignItems: "center", justifyContent: "center" },
+  list: { paddingBottom: NAV_SPACE + space.xl },
   resultHeader: { paddingHorizontal: space.lg, paddingTop: space.xs },
   count: { ...typography.micro, color: p.ink3, textTransform: "uppercase" },
   relaxed: { backgroundColor: p.warmSoft, padding: space.md, borderRadius: radius.md, gap: 3 },

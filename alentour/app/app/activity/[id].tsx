@@ -3,19 +3,22 @@
  * know" is honest and useful; a missing row implying "no" is neither.
  */
 import React, { useMemo, useState } from "react";
-import { View, Text, ScrollView, Pressable, Linking, Share, Platform, Image, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams } from "expo-router";
+import { View, Text, ScrollView, Pressable, Linking, Share, Platform, StyleSheet } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { haversineKm, a11yValue } from "@core/catalog/filter.ts";
 import { isOpenAt } from "@core/catalog/hours.ts";
 import { useStore } from "../../lib/store.tsx";
-import { config, mediaUrl } from "../../lib/config.ts";
+import { config } from "../../lib/config.ts";
 import { usePalette, space, radius, typography, type Palette } from "../../lib/theme.ts";
 import { formatPrice, formatDuration, formatDistance, effortLabel, formatDate } from "../../lib/format.ts";
 import { ListSheet } from "../../components/ListSheet.tsx";
 import { ReportSheet } from "../../components/ReportSheet.tsx";
 import { GoTogether } from "../../components/GoTogether.tsx";
 import { communityApi } from "../../lib/community.ts";
+import { Art } from "../../components/Art.tsx";
+import { Icon } from "../../components/Icon.tsx";
+import { Pill } from "../../components/ActivityCard.tsx";
 
 const A11Y_SLUGS = [
   "a11y.step_free_entry", "a11y.wheelchair_throughout", "a11y.accessible_washroom",
@@ -29,6 +32,9 @@ export default function ActivityDetail() {
   const { catalog, lang, t, rankContext, isSaved, toggleSave, account } = useStore();
   const [listOpen, setListOpen] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [more, setMore] = useState(false);
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [reportOpen, setReportOpen] = useState(false);
 
   // Accept either the id or the slug: shared links use the slug, which survives re-imports.
@@ -71,130 +77,169 @@ export default function ActivityDetail() {
     } catch { /* the user cancelled */ }
   };
 
+  const circle = (name: "arrow-left" | "share", onPress: () => void, label: string) => (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={s.roundBtn}>
+      <Icon name={name} size={22} color="#1F2326" />
+    </Pressable>
+  );
+  const longText = (activity.description ?? "").length > 150;
+
   return (
-    <SafeAreaView style={s.screen} edges={["bottom"]}>
-      <ScrollView contentContainerStyle={s.content}>
-        {activity.img ? (
-          <Image
-            source={{ uri: mediaUrl(activity.img.key) }}
-            style={[s.hero, activity.img.w && activity.img.h ? { aspectRatio: activity.img.w / activity.img.h } : null]}
-            accessibilityIgnoresInvertColors
-          />
-        ) : null}
-        <Text style={s.kicker}>{catalog.tagLabels[activity.cat] ?? activity.cat}</Text>
-        <Text style={s.title}>{activity.title}</Text>
-        {activity.summary ? <Text style={s.summary}>{activity.summary}</Text> : null}
-
-        <View style={s.factRow}>
-          <Fact p={p} label={t("detail.price")} value={formatPrice(activity, lang) || "—"} />
-          <Fact p={p} label={t("detail.duration")} value={formatDuration(activity, lang) || "—"} />
-          <Fact p={p} label={t("detail.distance")} value={formatDistance(distance, lang)} />
-          <Fact p={p} label={t("detail.effort")} value={effortLabel(activity, lang) ?? t("effort.1")} />
-        </View>
-
-        <View style={s.quick}>
-          <Quick p={p} label={t("detail.share")} onPress={share} />
-          <Quick p={p} label={t("detail.addToList")} onPress={() => setListOpen(true)} />
-          <Quick p={p} label={t("detail.report")} onPress={() => setReportOpen(true)} />
-        </View>
-
-        {activity.description ? (
-          <Section p={p} title={t("detail.about")}><Text style={s.body}>{activity.description}</Text></Section>
-        ) : null}
-        {activity.whatToBring ? (
-          <Section p={p} title={t("detail.bring")}><Text style={s.body}>{activity.whatToBring}</Text></Section>
-        ) : null}
-
-        <Section p={p} title={t("detail.hours")}>
-          <Text style={[s.body, open === "open" && s.open, open === "closed" && s.closed]}>
-            {open === "unknown" ? t("card.hoursUnknown") : open === "open" ? t("card.open") : t("card.closed")}
-          </Text>
-          {activity.hours ? <Text style={s.mono}>{activity.hours}</Text> : null}
-        </Section>
-
-        <Section p={p} title={t("detail.a11y")}>
-          {known.length === 0 && unknown.length === 0 ? <Text style={s.muted}>{t("detail.a11yNone")}</Text> : null}
-          {known.map((slug) => {
-            const v = a11yValue(activity, slug);
-            return (
-              <View key={slug} style={s.a11yRow}>
-                <Text style={[s.a11yMark, v ? s.yes : s.no]}>{v ? "✓" : "✕"}</Text>
-                <Text style={s.body}>{catalog.tagLabels[slug] ?? slug}</Text>
-              </View>
-            );
-          })}
-          {unknown.length > 0 ? (
-            <View style={s.unknownBox}>
-              <Text style={s.unknownLabel}>{t("detail.a11yUnverified")}</Text>
-              <Text style={s.muted}>{unknown.map((slug) => catalog.tagLabels[slug]).join(", ")}</Text>
-              <Text style={s.unknownNote}>{t("detail.a11yCallAhead")}</Text>
-            </View>
-          ) : null}
-        </Section>
-
-        {activity.tags.length > 0 ? (
-          <Section p={p} title={t("detail.tags")}>
-            <View style={s.tagWrap}>
-              {activity.tags.map((slug) => (
-                <View key={slug} style={s.tag}><Text style={s.tagText}>{catalog.tagLabels[slug] ?? slug}</Text></View>
-              ))}
-            </View>
-          </Section>
-        ) : null}
-
-        <GoTogether activityId={activity.id} />
-
-        {venue ? (
-          <Section p={p} title={t("detail.where")}>
-            <Text style={s.body}>{venue.name}</Text>
-            {venue.address ? <Text style={s.muted}>{venue.address}</Text> : null}
-            {venue.neighbourhood ? <Text style={s.muted}>{venue.neighbourhood}</Text> : null}
-          </Section>
-        ) : null}
-
-        {account && saved && !confirmed ? (
-          <View style={s.confirm}>
-            <Text style={s.body}>{t("detail.stillAccurate")}</Text>
+    <View style={s.screen}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 120 + Math.max(insets.bottom, 12) }} showsVerticalScrollIndicator={false}>
+        <Art id={activity.id} category={activity.cat} img={activity.img} scrim style={s.hero}>
+          <View style={[s.heroTop, { top: Math.max(insets.top, 14) + 6 }]}>
+            {circle("arrow-left", () => (router.canGoBack() ? router.back() : router.replace("/")), t("nav.back"))}
             <View style={{ flexDirection: "row", gap: space.sm }}>
-              {([true, false] as const).map((ok) => (
-                <Pressable key={String(ok)} style={s.confirmBtn} accessibilityRole="button"
-                  onPress={() => { void communityApi(account.token).confirm(activity.id, ok).catch(() => {}); setConfirmed(true); }}>
-                  <Text style={s.secondaryText}>{t(ok ? "detail.accurateYes" : "detail.accurateNo")}</Text>
-                </Pressable>
-              ))}
+              {circle("share", share, t("detail.share"))}
+              <Pressable onPress={() => toggleSave(activity.id)} accessibilityRole="button" accessibilityState={{ selected: saved }}
+                accessibilityLabel={t(saved ? "card.unsave" : "card.save")} style={s.roundBtn}>
+                <Icon name={saved ? "heart-fill" : "heart"} size={22} color={saved ? "#D6455D" : "#1F2326"} />
+              </Pressable>
             </View>
           </View>
-        ) : confirmed ? <Text style={s.muted}>{t("detail.accurateThanks")}</Text> : null}
+        </Art>
 
-        <Text style={s.verified}>
-          {activity.verifiedAt ? t("detail.verified", { date: formatDate(activity.verifiedAt, lang) }) : t("detail.unverified")}
-        </Text>
+        <View style={s.sheet}>
+          <View style={s.handle} />
+          <Text style={s.kicker}>{catalog.tagLabels[activity.cat] ?? activity.cat}</Text>
+          <Text style={s.title}>{activity.title}</Text>
+
+          <View style={s.chipRow}>
+            <View style={s.priceChip}><Text style={s.priceText}>{formatPrice(activity, lang) || "—"}</Text></View>
+            {open === "open" ? <Pill p={p} label={t("card.open")} tone="brand" /> : open === "closed" ? <Pill p={p} label={t("card.closed")} tone="muted" /> : null}
+          </View>
+
+          {venue ? (
+            <View style={s.place}>
+              <Icon name="pin" size={18} color={p.ink2} />
+              <Text style={s.placeText}>{venue.name}{venue.neighbourhood ? ` · ${venue.neighbourhood}` : ""}</Text>
+            </View>
+          ) : null}
+
+          {activity.summary || activity.description ? (
+            <View style={{ gap: 6 }}>
+              <Text style={s.body} numberOfLines={more ? undefined : 3}>{activity.description ?? activity.summary}</Text>
+              {longText ? (
+                <Pressable onPress={() => setMore(!more)} accessibilityRole="button">
+                  <Text style={s.readMore}>{t(more ? "detail.readLess" : "detail.readMore")}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+
+          <View style={s.facts}>
+            <Fact p={p} label={t("detail.duration")} value={formatDuration(activity, lang) || "—"} />
+            <Fact p={p} label={t("detail.distance")} value={formatDistance(distance, lang)} />
+            <Fact p={p} label={t("detail.effort")} value={effortLabel(activity, lang) ?? t("effort.1")} />
+          </View>
+
+          <View style={s.quick}>
+            <Quick p={p} label={t("detail.addToList")} onPress={() => setListOpen(true)} />
+            <Quick p={p} label={t("detail.report")} onPress={() => setReportOpen(true)} />
+          </View>
+
+          <GoTogether activityId={activity.id} />
+
+          <Accordion p={p} title={t("detail.hours")} startOpen>
+            <Text style={[s.body, open === "open" && s.open, open === "closed" && s.closed]}>
+              {open === "unknown" ? t("card.hoursUnknown") : open === "open" ? t("card.open") : t("card.closed")}
+            </Text>
+            {activity.hours ? <Text style={s.mono}>{activity.hours}</Text> : null}
+          </Accordion>
+
+          <Accordion p={p} title={t("detail.a11y")} startOpen>
+            {known.length === 0 && unknown.length === 0 ? <Text style={s.muted}>{t("detail.a11yNone")}</Text> : null}
+            {known.map((slug) => {
+              const v = a11yValue(activity, slug);
+              return (
+                <View key={slug} style={s.a11yRow}>
+                  <Icon name={v ? "check" : "x"} size={18} color={v ? p.brand : p.danger} strokeWidth={2.2} />
+                  <Text style={s.body}>{catalog.tagLabels[slug] ?? slug}</Text>
+                </View>
+              );
+            })}
+            {unknown.length > 0 ? (
+              <View style={s.unknownBox}>
+                <Text style={s.unknownLabel}>{t("detail.a11yUnverified")}</Text>
+                <Text style={s.muted}>{unknown.map((slug) => catalog.tagLabels[slug]).join(", ")}</Text>
+                <Text style={s.unknownNote}>{t("detail.a11yCallAhead")}</Text>
+              </View>
+            ) : null}
+          </Accordion>
+
+          {activity.whatToBring ? (
+            <Accordion p={p} title={t("detail.bring")}><Text style={s.body}>{activity.whatToBring}</Text></Accordion>
+          ) : null}
+
+          {activity.tags.length > 0 ? (
+            <Accordion p={p} title={t("detail.tags")}>
+              <View style={s.tagWrap}>
+                {activity.tags.map((slug) => (
+                  <View key={slug} style={s.tag}><Text style={s.tagText}>{catalog.tagLabels[slug] ?? slug}</Text></View>
+                ))}
+              </View>
+            </Accordion>
+          ) : null}
+
+          {venue ? (
+            <Accordion p={p} title={t("detail.where")}>
+              <Text style={s.body}>{venue.name}</Text>
+              {venue.address ? <Text style={s.muted}>{venue.address}</Text> : null}
+              {venue.neighbourhood ? <Text style={s.muted}>{venue.neighbourhood}</Text> : null}
+            </Accordion>
+          ) : null}
+
+          {account && saved && !confirmed ? (
+            <View style={s.confirm}>
+              <Text style={s.body}>{t("detail.stillAccurate")}</Text>
+              <View style={{ flexDirection: "row", gap: space.sm }}>
+                {([true, false] as const).map((ok) => (
+                  <Pressable key={String(ok)} style={s.confirmBtn} accessibilityRole="button"
+                    onPress={() => { void communityApi(account.token).confirm(activity.id, ok).catch(() => {}); setConfirmed(true); }}>
+                    <Text style={s.confirmText}>{t(ok ? "detail.accurateYes" : "detail.accurateNo")}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : confirmed ? <Text style={s.muted}>{t("detail.accurateThanks")}</Text> : null}
+
+          <Text style={s.verified}>
+            {activity.verifiedAt ? t("detail.verified", { date: formatDate(activity.verifiedAt, lang) }) : t("detail.unverified")}
+          </Text>
+        </View>
       </ScrollView>
 
-      <View style={s.actions}>
-        <Pressable style={[s.action, s.secondary]} onPress={() => toggleSave(activity.id)}
-          accessibilityRole="button" accessibilityState={{ selected: saved }}>
-          <Text style={s.secondaryText}>{saved ? t("detail.saved") : t("detail.save")}</Text>
-        </Pressable>
+      <View style={[s.cta, { bottom: Math.max(insets.bottom, 12) + 8 }]} pointerEvents="box-none">
         {activity.bookingUrl ? (
-          <Pressable style={[s.action, s.secondary]} onPress={() => void Linking.openURL(activity.bookingUrl!)} accessibilityRole="link">
-            <Text style={s.secondaryText}>{t("detail.book")}</Text>
+          <Pressable style={s.ctaSecondary} onPress={() => void Linking.openURL(activity.bookingUrl!)} accessibilityRole="link">
+            <Text style={s.ctaSecondaryText}>{t("detail.book")}</Text>
           </Pressable>
         ) : null}
-        <Pressable style={[s.action, s.primary]} onPress={openMaps} accessibilityRole="button">
-          <Text style={s.primaryText}>{t("detail.go")}</Text>
+        <Pressable style={s.ctaPrimary} onPress={openMaps} accessibilityRole="button">
+          <Text style={s.ctaPrimaryText}>{t("detail.go")}</Text>
         </Pressable>
       </View>
 
       <ListSheet activityId={activity.id} visible={listOpen} onClose={() => setListOpen(false)} />
       <ReportSheet activityId={activity.id} visible={reportOpen} onClose={() => setReportOpen(false)} />
-    </SafeAreaView>
+    </View>
   );
 }
 
-function Section({ p, title, children }: { p: Palette; title: string; children: React.ReactNode }) {
+/** A white card whose body opens and closes — the reference's day-by-day cards. */
+function Accordion({ p, title, children, startOpen }: { p: Palette; title: string; children: React.ReactNode; startOpen?: boolean }) {
   const s = styles(p);
-  return <View style={s.section}><Text style={s.sectionTitle}>{title}</Text>{children}</View>;
+  const [open, setOpen] = useState(!!startOpen);
+  return (
+    <View style={s.acc}>
+      <Pressable style={s.accHead} onPress={() => setOpen(!open)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
+        <Text style={s.accTitle}>{title}</Text>
+        <Icon name={open ? "chevron-up" : "chevron-down"} size={22} color={p.ink2} />
+      </Pressable>
+      {open ? <View style={s.accBody}>{children}</View> : null}
+    </View>
+  );
 }
 
 function Fact({ p, label, value }: { p: Palette; label: string; value: string }) {
@@ -214,51 +259,55 @@ function Quick({ p, label, onPress }: { p: Palette; label: string; onPress: () =
 const styles = (p: Palette) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: p.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: p.bg },
-  content: { padding: space.lg, gap: space.lg, paddingBottom: space.xxl },
-  confirm: { gap: space.sm, padding: space.md, backgroundColor: p.surface, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule },
-  confirmBtn: { backgroundColor: p.accentSoft, paddingHorizontal: space.lg, paddingVertical: space.sm, borderRadius: radius.pill },
-  hero: { width: "100%", aspectRatio: 4 / 3, maxHeight: 360, borderRadius: radius.lg, backgroundColor: p.surfaceAlt },
-  kicker: { ...typography.micro, color: p.accent, textTransform: "uppercase" },
-  title: { ...typography.display, color: p.ink, marginTop: -space.sm },
-  summary: { ...typography.body, color: p.ink2, marginTop: -space.sm },
-  factRow: {
-    flexDirection: "row", flexWrap: "wrap", backgroundColor: p.surface,
-    borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule,
+  hero: { height: 360 },
+  heroTop: { position: "absolute", left: space.lg, right: space.lg, flexDirection: "row", justifyContent: "space-between" },
+  roundBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: "rgba(255,255,255,0.94)", alignItems: "center", justifyContent: "center" },
+  sheet: {
+    marginTop: -34, backgroundColor: p.bg, borderTopLeftRadius: radius.xl + 4, borderTopRightRadius: radius.xl + 4,
+    paddingHorizontal: space.lg, paddingTop: space.md, gap: space.lg,
   },
-  fact: { flexGrow: 1, flexBasis: "25%", padding: space.md, gap: 2 },
+  handle: { alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: p.rule },
+  kicker: { ...typography.micro, color: p.brand, textTransform: "uppercase", marginBottom: -space.sm },
+  title: { ...typography.display, color: p.ink, marginTop: -space.md },
+  chipRow: { flexDirection: "row", alignItems: "center", gap: space.sm, marginTop: -space.sm },
+  priceChip: { backgroundColor: p.accent, paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.pill },
+  priceText: { ...typography.small, color: p.onAccent, fontWeight: "600" },
+  place: { flexDirection: "row", alignItems: "center", gap: space.sm, marginTop: -space.xs },
+  placeText: { ...typography.body, color: p.ink2, flexShrink: 1 },
+  body: { ...typography.body, color: p.ink2, lineHeight: 22 },
+  readMore: { ...typography.body, color: p.ink, textDecorationLine: "underline", fontWeight: "500" },
+  facts: { flexDirection: "row", gap: space.sm },
+  fact: { flex: 1, backgroundColor: p.surface, borderRadius: radius.md + 2, padding: space.md, gap: 2 },
   factLabel: { ...typography.micro, color: p.ink4, textTransform: "uppercase" },
   factValue: { ...typography.body, color: p.ink, fontWeight: "600" },
   quick: { flexDirection: "row", gap: space.sm, flexWrap: "wrap" },
-  quickBtn: {
-    paddingHorizontal: space.md, paddingVertical: 8, borderRadius: radius.pill, minHeight: 36,
-    backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule, justifyContent: "center",
-  },
+  quickBtn: { paddingHorizontal: 16, height: 40, borderRadius: radius.pill, backgroundColor: p.surface, justifyContent: "center" },
   quickText: { ...typography.small, color: p.ink2, fontWeight: "500" },
-  section: { gap: space.xs },
-  sectionTitle: { ...typography.heading, color: p.ink },
-  body: { ...typography.body, color: p.ink2, lineHeight: 22 },
+  acc: { backgroundColor: p.surface, borderRadius: radius.lg },
+  accHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.lg, paddingVertical: 18 },
+  accTitle: { ...typography.heading, color: p.ink },
+  accBody: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.xs },
   muted: { ...typography.small, color: p.ink3 },
   mono: { ...typography.small, color: p.ink3, fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }) },
-  open: { color: p.accent, fontWeight: "600" },
+  open: { color: p.brand, fontWeight: "600" },
   closed: { color: p.ink3 },
   a11yRow: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: 3 },
-  a11yMark: { fontSize: 15, fontWeight: "700", width: 18 },
-  yes: { color: p.accent },
-  no: { color: p.danger },
   unknownBox: { backgroundColor: p.warmSoft, padding: space.md, borderRadius: radius.md, gap: 3, marginTop: space.xs },
   unknownLabel: { ...typography.micro, color: p.warm, textTransform: "uppercase" },
   unknownNote: { ...typography.small, color: p.ink3, marginTop: 4 },
   tagWrap: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
   tag: { paddingHorizontal: space.md, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: p.surfaceAlt },
   tagText: { ...typography.small, color: p.ink2 },
-  verified: { ...typography.micro, color: p.ink4, textAlign: "center", marginTop: space.md },
-  actions: {
-    flexDirection: "row", gap: space.sm, padding: space.lg,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: p.rule, backgroundColor: p.surface,
+  confirm: { gap: space.sm, padding: space.lg, backgroundColor: p.surface, borderRadius: radius.lg },
+  confirmBtn: { backgroundColor: p.accentSoft, paddingHorizontal: space.lg, height: 40, justifyContent: "center", borderRadius: radius.pill },
+  confirmText: { ...typography.small, color: p.ink, fontWeight: "600" },
+  verified: { ...typography.micro, color: p.ink4, textAlign: "center" },
+  cta: { position: "absolute", left: space.lg, right: space.lg, flexDirection: "row", gap: space.sm },
+  ctaPrimary: {
+    flex: 1, height: 60, borderRadius: 30, backgroundColor: p.accent, alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8,
   },
-  action: { flex: 1, paddingVertical: 14, borderRadius: radius.md, alignItems: "center", minHeight: 48, justifyContent: "center" },
-  primary: { backgroundColor: p.accent },
-  primaryText: { ...typography.heading, color: p.onAccent },
-  secondary: { backgroundColor: p.surfaceAlt },
-  secondaryText: { ...typography.heading, color: p.ink2 },
+  ctaPrimaryText: { ...typography.heading, color: p.onAccent },
+  ctaSecondary: { paddingHorizontal: 26, height: 60, borderRadius: 30, backgroundColor: p.surface, alignItems: "center", justifyContent: "center" },
+  ctaSecondaryText: { ...typography.heading, color: p.ink },
 });

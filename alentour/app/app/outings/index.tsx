@@ -10,6 +10,7 @@ import { useStore } from "../../lib/store.tsx";
 import { outingsApi, type Eligibility, type OutingSummary } from "../../lib/outings.ts";
 import { usePalette, space, radius, typography, type Palette } from "../../lib/theme.ts";
 import { formatWhen } from "../../lib/format.ts";
+import { NavBar, NAV_SPACE } from "../../components/NavBar.tsx";
 
 export default function Outings() {
   const p = usePalette();
@@ -48,7 +49,8 @@ export default function Outings() {
   const week = outings.filter((o) => o.status !== "voting" && !mine.includes(o));
 
   return (
-    <SafeAreaView style={s.screen} edges={["bottom"]}>
+    <SafeAreaView style={s.screen} edges={["top"]}>
+      <Text style={s.heading}>{t("outings.title")}</Text>
       <ScrollView contentContainerStyle={s.content} refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={p.ink3} />}>
         <Text style={s.intro}>{t("outings.intro")}</Text>
         {elig && !elig.ok ? (
@@ -63,6 +65,7 @@ export default function Outings() {
         <Group p={p} title={t("outings.week")} items={week} title4={title} lang={lang} t={t} />
         {!outings.length && !paused ? <Text style={s.muted}>{t("outings.empty")}</Text> : null}
       </ScrollView>
+      <NavBar active="outings" />
     </SafeAreaView>
   );
 }
@@ -101,7 +104,8 @@ function Empty({ p, text }: { p: Palette; text: string }) {
 const styles = (p: Palette) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: p.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, padding: space.xl, backgroundColor: p.bg },
-  content: { padding: space.lg, gap: space.lg, paddingBottom: space.xxl },
+  heading: { ...typography.display, color: p.ink, paddingHorizontal: space.lg, paddingTop: space.sm },
+  content: { padding: space.lg, gap: space.lg, paddingBottom: NAV_SPACE + space.xl },
   intro: { ...typography.small, color: p.ink3 },
   body: { ...typography.body, color: p.ink, textAlign: "center" },
   muted: { ...typography.small, color: p.ink3 },
@@ -110,12 +114,9 @@ const styles = (p: Palette) => StyleSheet.create({
   setupText: { ...typography.heading, color: p.accent },
   group: { gap: space.sm },
   groupTitle: { ...typography.micro, color: p.ink3, textTransform: "uppercase" },
-  row: {
-    flexDirection: "row", alignItems: "center", gap: space.md, padding: space.md, backgroundColor: p.surface,
-    borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule,
-  },
+  row: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.lg, backgroundColor: p.surface, borderRadius: radius.lg },
   rowTitle: { ...typography.heading, color: p.ink },
-  mode: { ...typography.micro, color: p.accent },
+  mode: { ...typography.micro, color: p.brand },
   count: { ...typography.small, color: p.ink2, fontWeight: "600" },
   primary: { backgroundColor: p.accent, paddingHorizontal: space.xl, paddingVertical: space.md, borderRadius: radius.pill },
   primaryText: { ...typography.heading, color: p.onAccent },

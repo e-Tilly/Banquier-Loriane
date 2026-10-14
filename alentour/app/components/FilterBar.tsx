@@ -70,10 +70,10 @@ const styles = (p: Palette) => StyleSheet.create({
   scroll: { flexGrow: 0, flexShrink: 0 },
   row: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.lg },
   chip: {
-    paddingHorizontal: space.md, paddingVertical: 7, borderRadius: radius.pill,
-    backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule,
+    paddingHorizontal: 18, height: 42, justifyContent: "center", borderRadius: radius.pill,
+    backgroundColor: p.surface,
   },
-  chipActive: { backgroundColor: p.accent, borderColor: p.accent },
-  chipText: { ...typography.small, color: p.ink2, fontWeight: "500" },
+  chipActive: { backgroundColor: p.accent },
+  chipText: { ...typography.body, color: p.ink2, fontWeight: "500" },
   chipTextActive: { color: p.onAccent, fontWeight: "600" },
 });

@@ -24,7 +24,7 @@ function Screens() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: p.bg },
+        headerStyle: { backgroundColor: p.bg }, headerShadowVisible: false,
         headerTintColor: p.ink,
         headerTitleStyle: { fontWeight: "700" },
         headerBackTitle: t("nav.back"),
@@ -32,15 +32,15 @@ function Screens() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="browse" options={{ title: t("nav.explore") }} />
-      <Stack.Screen name="map" options={{ title: t("nav.map") }} />
-      <Stack.Screen name="saved" options={{ title: t("nav.saved") }} />
+      <Stack.Screen name="browse" options={{ headerShown: false }} />
+      <Stack.Screen name="map" options={{ headerShown: false }} />
+      <Stack.Screen name="saved" options={{ headerShown: false }} />
       <Stack.Screen name="settings" options={{ title: t("nav.settings") }} />
       <Stack.Screen name="signin" options={{ title: t("signin.title"), presentation: "modal" }} />
-      <Stack.Screen name="activity/[id]" options={{ title: "" }} />
+      <Stack.Screen name="activity/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="add" options={{ title: t("nav.add"), presentation: "modal" }} />
-      <Stack.Screen name="outings/index" options={{ title: t("nav.outings") }} />
-      <Stack.Screen name="outings/[id]" options={{ title: "" }} />
+      <Stack.Screen name="outings/index" options={{ headerShown: false }} />
+      <Stack.Screen name="outings/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="outings/setup" options={{ title: t("setup.title"), presentation: "modal" }} />
     </Stack>
   );
