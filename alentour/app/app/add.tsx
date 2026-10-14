@@ -179,8 +179,8 @@ export default function Add() {
 }
 
 const styles = (p: Palette) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: p.bg },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.lg, padding: space.xl, backgroundColor: p.bg },
+  screen: { flex: 1, backgroundColor: p.canvas },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.lg, padding: space.xl, backgroundColor: p.canvas },
   content: { padding: space.lg, gap: space.sm, paddingBottom: space.xxl },
   label: { ...typography.heading, color: p.ink, marginTop: space.sm },
   body: { ...typography.body, color: p.ink },
@@ -189,14 +189,14 @@ const styles = (p: Palette) => StyleSheet.create({
   done: { ...typography.heading, color: p.accent, textAlign: "center" },
   error: { ...typography.body, color: p.danger },
   link: { ...typography.body, color: p.accent, textDecorationLine: "underline" },
-  input: { borderWidth: 1, borderColor: p.rule, borderRadius: radius.md, padding: space.md, color: p.ink, backgroundColor: p.surface, fontSize: 16 },
+  input: { borderWidth: 1, borderColor: p.rule, borderRadius: radius.md, padding: space.md, color: p.ink, ...p.glass, fontSize: 16 },
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
   row: { flexDirection: "row", alignItems: "center", gap: space.md },
-  chip: { paddingHorizontal: space.md, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: p.rule, backgroundColor: p.surface },
+  chip: { paddingHorizontal: space.md, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: p.rule, ...p.glassFlat },
   chipOn: { backgroundColor: p.accent, borderColor: p.accent },
   chipText: { ...typography.small, color: p.ink2 },
   chipTextOn: { color: p.onAccent, fontWeight: "600" },
-  venue: { padding: space.md, borderRadius: radius.md, backgroundColor: p.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule },
+  venue: { padding: space.md, borderRadius: radius.md, ...p.glass, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule },
   venueOn: { borderColor: p.accent, borderWidth: 2 },
   card: { gap: space.sm, padding: space.md, backgroundColor: p.warmSoft, borderRadius: radius.lg },
   primary: { backgroundColor: p.accent, padding: space.md, borderRadius: radius.pill, alignItems: "center", marginTop: space.md },

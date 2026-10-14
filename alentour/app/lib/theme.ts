@@ -1,30 +1,57 @@
-/** Design tokens. Soft grey ground, white cards with large radii, and ONE strong move: near-black
- *  pills for everything that acts (primary buttons, the active chip, the floating nav). Colour comes
- *  from the content's own artwork or photo, not from the chrome. */
-import { useColorScheme } from "react-native";
+/** Design tokens. LIGHT ONLY. A soft pastel backdrop sits behind everything and the layers on top
+ *  of it are frosted glass: translucent white, a blurred view of what is behind, a bright hairline
+ *  edge and a soft shadow. Near-black pills stay for the things that act. */
+import { Platform, type ViewStyle } from "react-native";
+
+/** Web gets a real backdrop blur through CSS. Native uses <GlassLayer> (expo-blur) where it matters,
+ *  and plain translucency elsewhere. */
+const web = (v: Record<string, string>) => (Platform.OS === "web" ? v : {}) as unknown as ViewStyle;
+
+const glassBase = {
+  backgroundColor: "rgba(255,255,255,0.52)",
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.85)",
+  ...web({ backdropFilter: "blur(22px) saturate(170%)", WebkitBackdropFilter: "blur(22px) saturate(170%)", boxShadow: "0 8px 32px rgba(50,60,110,0.10)" }),
+} as ViewStyle;
+
+const glassStrong = {
+  backgroundColor: "rgba(255,255,255,0.72)",
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.9)",
+  ...web({ backdropFilter: "blur(30px) saturate(180%)", WebkitBackdropFilter: "blur(30px) saturate(180%)", boxShadow: "0 12px 40px rgba(50,60,110,0.14)" }),
+} as ViewStyle;
+
+/** Translucent without blur — for small items inside scrolling rows, where a blur layer misrenders. */
+const glassFlat = {
+  backgroundColor: "rgba(255,255,255,0.62)",
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.9)",
+} as ViewStyle;
+
+/** Glass that sits on artwork or photos: lighter, so the picture stays visible through it. */
+const glassOnArt = {
+  backgroundColor: "rgba(255,255,255,0.30)",
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.55)",
+  ...web({ backdropFilter: "blur(16px) saturate(160%)", WebkitBackdropFilter: "blur(16px) saturate(160%)" }),
+} as ViewStyle;
 
 const light = {
-  bg: "#F5F5F4", surface: "#FFFFFF", surfaceAlt: "#ECEDEC",
-  ink: "#1B1F22", ink2: "#3A4146", ink3: "#70777C", ink4: "#A3A9AD",
-  rule: "#E4E6E6", accent: "#1F2326", accentSoft: "#ECEDED", onAccent: "#FFFFFF",
-  brand: "#1F5F4B", brandSoft: "#E3EFE9",
-  warm: "#8F5E16", warmSoft: "#F5EDDD", danger: "#B03A2E",
-  navBg: "#1F2326", navFg: "#9AA1A5", navActiveBg: "#FFFFFF", navActiveFg: "#1F2326",
-};
-
-const dark: typeof light = {
-  bg: "#0F1112", surface: "#1A1D1F", surfaceAlt: "#25292B",
-  ink: "#F0F2F2", ink2: "#CBD0D2", ink3: "#8D9599", ink4: "#656C70",
-  rule: "#2B3033", accent: "#F0F2F2", accentSoft: "#25292B", onAccent: "#111314",
-  brand: "#79C3A6", brandSoft: "#17302A",
-  warm: "#D7A45C", warmSoft: "#2E2517", danger: "#E0948A",
-  navBg: "#26292B", navFg: "#8D9599", navActiveBg: "#F0F2F2", navActiveFg: "#111314",
+  /** Solid fallback ground — used by modal sheets. Screens use `canvas` and show the backdrop. */
+  bg: "#EEF1F8", canvas: "transparent", surface: "#FFFFFF", surfaceAlt: "rgba(40,50,90,0.07)",
+  ink: "#1B1F2A", ink2: "#3A4152", ink3: "#6C7385", ink4: "#9CA2B2",
+  rule: "rgba(40,50,90,0.10)", accent: "#1F2433", accentSoft: "rgba(40,50,90,0.08)", onAccent: "#FFFFFF",
+  brand: "#1F5F4B", brandSoft: "rgba(31,95,75,0.12)",
+  warm: "#8F5E16", warmSoft: "rgba(214,160,60,0.18)", danger: "#B03A2E",
+  navActive: "#1F2433", navActiveFg: "#FFFFFF", navFg: "#5B6275",
+  glass: glassBase, glassStrong, glassOnArt, glassFlat,
 };
 
 export type Palette = typeof light;
 
+/** One palette. The app is light by design; the glass needs a bright backdrop to read. */
 export function usePalette(): Palette {
-  return useColorScheme() === "dark" ? dark : light;
+  return light;
 }
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };

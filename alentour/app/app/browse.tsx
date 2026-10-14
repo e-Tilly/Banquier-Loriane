@@ -99,10 +99,10 @@ export default function Browse() {
 }
 
 const styles = (p: Palette) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: p.bg },
+  screen: { flex: 1, backgroundColor: p.canvas },
   heading: { ...typography.display, color: p.ink, paddingHorizontal: space.lg, paddingTop: space.sm },
   searchRow: {
-    marginHorizontal: space.lg, marginVertical: space.md, height: 60, borderRadius: radius.pill, backgroundColor: p.surface,
+    marginHorizontal: space.lg, marginVertical: space.md, height: 60, borderRadius: radius.pill, ...p.glass,
     flexDirection: "row", alignItems: "center", gap: space.sm, paddingLeft: space.lg, paddingRight: 8,
   },
   input: { flex: 1, ...typography.body, color: p.ink, height: 44, outlineStyle: "none" } as never,

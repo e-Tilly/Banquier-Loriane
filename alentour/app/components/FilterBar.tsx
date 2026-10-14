@@ -71,7 +71,7 @@ const styles = (p: Palette) => StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.lg },
   chip: {
     paddingHorizontal: 18, height: 42, justifyContent: "center", borderRadius: radius.pill,
-    backgroundColor: p.surface,
+    ...p.glassFlat,
   },
   chipActive: { backgroundColor: p.accent },
   chipText: { ...typography.body, color: p.ink2, fontWeight: "500" },

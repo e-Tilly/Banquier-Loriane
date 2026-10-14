@@ -86,12 +86,12 @@ function Primary({ p, label, onPress, disabled, busy }: { p: Palette; label: str
 }
 
 const styles = (p: Palette) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: p.bg },
+  screen: { flex: 1, backgroundColor: p.canvas },
   body: { flex: 1, padding: space.lg, gap: space.md },
   pitch: { ...typography.title, color: p.ink, marginBottom: space.sm },
   label: { ...typography.small, color: p.ink2 },
   input: {
-    backgroundColor: p.surface, borderRadius: radius.md, paddingHorizontal: space.md, minHeight: 48,
+    ...p.glass, borderRadius: radius.md, paddingHorizontal: space.md, minHeight: 48,
     ...typography.body, color: p.ink, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule,
   },
   codeInput: { fontSize: 24, letterSpacing: 8, textAlign: "center" },

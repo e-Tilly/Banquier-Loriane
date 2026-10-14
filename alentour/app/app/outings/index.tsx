@@ -102,8 +102,8 @@ function Empty({ p, text }: { p: Palette; text: string }) {
 }
 
 const styles = (p: Palette) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: p.bg },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, padding: space.xl, backgroundColor: p.bg },
+  screen: { flex: 1, backgroundColor: p.canvas },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, padding: space.xl, backgroundColor: p.canvas },
   heading: { ...typography.display, color: p.ink, paddingHorizontal: space.lg, paddingTop: space.sm },
   content: { padding: space.lg, gap: space.lg, paddingBottom: NAV_SPACE + space.xl },
   intro: { ...typography.small, color: p.ink3 },
@@ -114,7 +114,7 @@ const styles = (p: Palette) => StyleSheet.create({
   setupText: { ...typography.heading, color: p.accent },
   group: { gap: space.sm },
   groupTitle: { ...typography.micro, color: p.ink3, textTransform: "uppercase" },
-  row: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.lg, backgroundColor: p.surface, borderRadius: radius.lg },
+  row: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.lg, ...p.glass, borderRadius: radius.lg },
   rowTitle: { ...typography.heading, color: p.ink },
   mode: { ...typography.micro, color: p.brand },
   count: { ...typography.small, color: p.ink2, fontWeight: "600" },

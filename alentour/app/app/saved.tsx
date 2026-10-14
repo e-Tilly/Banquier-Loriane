@@ -97,11 +97,11 @@ function Tab({ p, label, active, onPress, onLongPress }: {
 }
 
 const styles = (p: Palette) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: p.bg },
+  screen: { flex: 1, backgroundColor: p.canvas },
   tabsWrap: { height: 52, flexGrow: 0, flexShrink: 0 },
   tabs: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.lg },
   tab: {
-    paddingHorizontal: 18, height: 42, justifyContent: "center", borderRadius: radius.pill, backgroundColor: p.surface,
+    paddingHorizontal: 18, height: 42, justifyContent: "center", borderRadius: radius.pill, ...p.glassFlat,
   },
   tabActive: { backgroundColor: p.accent },
   tabText: { ...typography.body, color: p.ink2, fontWeight: "500" },

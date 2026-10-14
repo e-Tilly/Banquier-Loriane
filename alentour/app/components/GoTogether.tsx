@@ -68,7 +68,7 @@ const styles = (p: Palette) => StyleSheet.create({
   body: { ...typography.body, color: p.ink },
   muted: { ...typography.small, color: p.ink3 },
   note: { ...typography.small, color: p.accent },
-  row: { flexDirection: "row", justifyContent: "space-between", padding: space.md, backgroundColor: p.surface, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule },
+  row: { flexDirection: "row", justifyContent: "space-between", padding: space.md, ...p.glass, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule },
   button: { alignSelf: "flex-start", backgroundColor: p.accentSoft, paddingHorizontal: space.lg, paddingVertical: space.sm, borderRadius: radius.pill },
   buttonText: { ...typography.heading, color: p.accent },
 });

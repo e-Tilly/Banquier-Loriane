@@ -86,7 +86,7 @@ export default function ActivityDetail() {
 
   return (
     <View style={s.screen}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 + Math.max(insets.bottom, 12) }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         <Art id={activity.id} category={activity.cat} img={activity.img} scrim style={s.hero}>
           <View style={[s.heroTop, { top: Math.max(insets.top, 14) + 6 }]}>
             {circle("arrow-left", () => (router.canGoBack() ? router.back() : router.replace("/")), t("nav.back"))}
@@ -100,7 +100,7 @@ export default function ActivityDetail() {
           </View>
         </Art>
 
-        <View style={s.sheet}>
+        <View style={[s.sheet, { paddingBottom: 130 + Math.max(insets.bottom, 12) }]}>
           <View style={s.handle} />
           <Text style={s.kicker}>{catalog.tagLabels[activity.cat] ?? activity.cat}</Text>
           <Text style={s.title}>{activity.title}</Text>
@@ -257,16 +257,16 @@ function Quick({ p, label, onPress }: { p: Palette; label: string; onPress: () =
 }
 
 const styles = (p: Palette) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: p.bg },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: p.bg },
+  screen: { flex: 1, backgroundColor: p.canvas },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: p.canvas },
   hero: { height: 360 },
   heroTop: { position: "absolute", left: space.lg, right: space.lg, flexDirection: "row", justifyContent: "space-between" },
-  roundBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: "rgba(255,255,255,0.94)", alignItems: "center", justifyContent: "center" },
+  roundBtn: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center", ...p.glassStrong },
   sheet: {
-    marginTop: -34, backgroundColor: p.bg, borderTopLeftRadius: radius.xl + 4, borderTopRightRadius: radius.xl + 4,
-    paddingHorizontal: space.lg, paddingTop: space.md, gap: space.lg,
+    marginTop: -34, ...p.glassStrong, borderBottomWidth: 0, borderTopLeftRadius: radius.xl + 4, borderTopRightRadius: radius.xl + 4,
+    paddingHorizontal: space.lg, paddingTop: space.lg + 4, gap: space.lg, minHeight: 640, flexGrow: 1,
   },
-  handle: { alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: p.rule },
+  handle: { alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: "rgba(40,50,90,0.18)" },
   kicker: { ...typography.micro, color: p.brand, textTransform: "uppercase", marginBottom: -space.sm },
   title: { ...typography.display, color: p.ink, marginTop: -space.md },
   chipRow: { flexDirection: "row", alignItems: "center", gap: space.sm, marginTop: -space.sm },
@@ -277,13 +277,13 @@ const styles = (p: Palette) => StyleSheet.create({
   body: { ...typography.body, color: p.ink2, lineHeight: 22 },
   readMore: { ...typography.body, color: p.ink, textDecorationLine: "underline", fontWeight: "500" },
   facts: { flexDirection: "row", gap: space.sm },
-  fact: { flex: 1, backgroundColor: p.surface, borderRadius: radius.md + 2, padding: space.md, gap: 2 },
+  fact: { flex: 1, ...p.glass, borderRadius: radius.md + 2, padding: space.md, gap: 2 },
   factLabel: { ...typography.micro, color: p.ink4, textTransform: "uppercase" },
   factValue: { ...typography.body, color: p.ink, fontWeight: "600" },
   quick: { flexDirection: "row", gap: space.sm, flexWrap: "wrap" },
-  quickBtn: { paddingHorizontal: 16, height: 40, borderRadius: radius.pill, backgroundColor: p.surface, justifyContent: "center" },
+  quickBtn: { paddingHorizontal: 16, height: 40, borderRadius: radius.pill, ...p.glass, justifyContent: "center" },
   quickText: { ...typography.small, color: p.ink2, fontWeight: "500" },
-  acc: { backgroundColor: p.surface, borderRadius: radius.lg },
+  acc: { ...p.glass, borderRadius: radius.lg },
   accHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.lg, paddingVertical: 18 },
   accTitle: { ...typography.heading, color: p.ink },
   accBody: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.xs },
@@ -298,7 +298,7 @@ const styles = (p: Palette) => StyleSheet.create({
   tagWrap: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
   tag: { paddingHorizontal: space.md, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: p.surfaceAlt },
   tagText: { ...typography.small, color: p.ink2 },
-  confirm: { gap: space.sm, padding: space.lg, backgroundColor: p.surface, borderRadius: radius.lg },
+  confirm: { gap: space.sm, padding: space.lg, ...p.glass, borderRadius: radius.lg },
   confirmBtn: { backgroundColor: p.accentSoft, paddingHorizontal: space.lg, height: 40, justifyContent: "center", borderRadius: radius.pill },
   confirmText: { ...typography.small, color: p.ink, fontWeight: "600" },
   verified: { ...typography.micro, color: p.ink4, textAlign: "center" },
@@ -308,6 +308,6 @@ const styles = (p: Palette) => StyleSheet.create({
     shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8,
   },
   ctaPrimaryText: { ...typography.heading, color: p.onAccent },
-  ctaSecondary: { paddingHorizontal: 26, height: 60, borderRadius: 30, backgroundColor: p.surface, alignItems: "center", justifyContent: "center" },
+  ctaSecondary: { paddingHorizontal: 26, height: 60, borderRadius: 30, ...p.glass, alignItems: "center", justifyContent: "center" },
   ctaSecondaryText: { ...typography.heading, color: p.ink },
 });

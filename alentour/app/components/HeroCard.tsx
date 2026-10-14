@@ -8,6 +8,7 @@ import { formatPrice, formatDuration, formatDistance, type Lang } from "../lib/f
 import { translate } from "../lib/i18n.ts";
 import { useStore } from "../lib/store.tsx";
 import { Art } from "./Art.tsx";
+import { GlassLayer } from "./Glass.tsx";
 import { Icon } from "./Icon.tsx";
 import { HeartButton } from "./ActivityCard.tsx";
 
@@ -30,9 +31,10 @@ export function HeroCard({ item, lang, saved, onToggleSave, width }: {
             <Text style={s.place} numberOfLines={1}>{venue?.neighbourhood ?? catalog?.tagLabels[a.cat] ?? ""}</Text>
             <Text style={s.title} numberOfLines={2}>{a.title}</Text>
             <View style={s.facts}>
-              {facts.map((f) => (<View key={f} style={s.fact}><Text style={s.factText}>{f}</Text></View>))}
+              {facts.map((f) => (<View key={f} style={s.fact}><GlassLayer onArt radius={999} /><Text style={s.factText}>{f}</Text></View>))}
             </View>
             <View style={s.more}>
+              <GlassLayer onArt radius={999} />
               <Text style={s.moreText}>{translate("card.seeMore", lang)}</Text>
               <View style={s.moreGo}><Icon name="arrow-right" size={20} color="#1F2326" /></View>
             </View>
@@ -50,12 +52,12 @@ const s = StyleSheet.create({
   place: { ...typography.body, color: "rgba(255,255,255,0.82)" },
   title: { fontSize: 27, fontWeight: "600", letterSpacing: -0.6, color: "#FFFFFF" },
   facts: { flexDirection: "row", gap: 6, flexWrap: "wrap", marginTop: 2 },
-  fact: { backgroundColor: "rgba(255,255,255,0.22)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
+  fact: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.pill, overflow: "hidden" },
   factText: { ...typography.small, color: "#FFFFFF", fontWeight: "500" },
   more: {
-    marginTop: space.md, height: 56, borderRadius: 28, backgroundColor: "rgba(20,24,26,0.72)",
+    marginTop: space.md, height: 58, borderRadius: 29, overflow: "hidden",
     flexDirection: "row", alignItems: "center", justifyContent: "center", paddingHorizontal: 6,
   },
   moreText: { ...typography.heading, color: "#FFFFFF", flex: 1, textAlign: "center", marginLeft: 44 },
-  moreGo: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
+  moreGo: { width: 46, height: 46, borderRadius: 23, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
 });

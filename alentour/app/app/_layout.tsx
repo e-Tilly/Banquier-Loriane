@@ -1,18 +1,23 @@
 import React from "react";
-import { Stack } from "expo-router";
+import { Stack, ThemeProvider, DefaultTheme } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { useColorScheme } from "react-native";
+import { View } from "react-native";
+import { AppBackground } from "../components/AppBackground.tsx";
 import { StoreProvider, useStore } from "../lib/store.tsx";
 import { usePalette } from "../lib/theme.ts";
 
 export default function RootLayout() {
-  const scheme = useColorScheme();
   return (
     <SafeAreaProvider>
       <StoreProvider>
-        <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-        <Screens />
+        <StatusBar style="dark" />
+        <View style={{ flex: 1, backgroundColor: "#EEF1F8" }}>
+          <AppBackground />
+          <ThemeProvider value={{ ...DefaultTheme, colors: { ...DefaultTheme.colors, background: "transparent", card: "transparent" } }}>
+            <Screens />
+          </ThemeProvider>
+        </View>
       </StoreProvider>
     </SafeAreaProvider>
   );
@@ -24,11 +29,11 @@ function Screens() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: p.bg }, headerShadowVisible: false,
+        headerStyle: { backgroundColor: "transparent" }, headerShadowVisible: false,
         headerTintColor: p.ink,
         headerTitleStyle: { fontWeight: "700" },
         headerBackTitle: t("nav.back"),
-        contentStyle: { backgroundColor: p.bg },
+        contentStyle: { backgroundColor: "transparent" },
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />

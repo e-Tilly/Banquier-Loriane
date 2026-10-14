@@ -209,10 +209,10 @@ export default function OutingScreen() {
 }
 
 const styles = (p: Palette) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: p.bg },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xl, backgroundColor: p.bg },
+  screen: { flex: 1, backgroundColor: p.canvas },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xl, backgroundColor: p.canvas },
   content: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
-  back: { width: 46, height: 46, borderRadius: 23, backgroundColor: p.surface, alignItems: "center", justifyContent: "center" },
+  back: { width: 46, height: 46, borderRadius: 23, ...p.glass, alignItems: "center", justifyContent: "center" },
   kicker: { ...typography.micro, color: p.accent, textTransform: "uppercase" },
   title: { ...typography.display, color: p.ink },
   when: { ...typography.heading, color: p.ink },
@@ -223,7 +223,7 @@ const styles = (p: Palette) => StyleSheet.create({
   heading: { ...typography.heading, color: p.ink },
   paused: { ...typography.body, color: p.warm, backgroundColor: p.warmSoft, padding: space.md, borderRadius: radius.md },
   note: { ...typography.body, color: p.accent, backgroundColor: p.accentSoft, padding: space.md, borderRadius: radius.md },
-  card: { gap: space.sm, padding: space.md, backgroundColor: p.surface, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule },
+  card: { gap: space.sm, padding: space.md, ...p.glass, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule },
   option: { flexDirection: "row", alignItems: "center", gap: space.xs, paddingVertical: space.xs },
   chip: { paddingHorizontal: space.sm, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: p.rule },
   chipOn: { backgroundColor: p.accent, borderColor: p.accent },

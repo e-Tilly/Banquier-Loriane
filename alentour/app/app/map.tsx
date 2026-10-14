@@ -1,6 +1,6 @@
 /** Map of whatever the current filters return, with a card for the tapped marker. */
 import React, { useMemo, useState } from "react";
-import { View, Text, FlatList, StyleSheet, useColorScheme } from "react-native";
+import { View, Text, FlatList, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { applyFilters } from "@core/catalog/filter.ts";
 import { useStore } from "../lib/store.tsx";
@@ -14,7 +14,7 @@ import { NavBar, NAV_SPACE } from "../components/NavBar.tsx";
 export default function MapScreen() {
   const p = usePalette();
   const s = styles(p);
-  const dark = useColorScheme() === "dark";
+  const dark = false;
   const { catalog, lang, t, filters, setFilters, rankContext, position, isSaved, toggleSave } = useStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -70,7 +70,7 @@ export default function MapScreen() {
 }
 
 const styles = (p: Palette) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: p.bg },
+  screen: { flex: 1, backgroundColor: p.canvas },
   mapWrap: { flex: 1, position: "relative", overflow: "hidden", marginHorizontal: space.lg, marginBottom: NAV_SPACE - 8, borderRadius: radius.xl },
   heading: { ...typography.display, color: p.ink, paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.sm },
   selected: { position: "absolute", left: space.sm, right: space.sm, bottom: space.sm },

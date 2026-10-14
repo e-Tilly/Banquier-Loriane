@@ -140,12 +140,12 @@ function Group({ p, title, children }: { p: Palette; title: string; children: Re
 }
 
 const styles = (p: Palette) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: p.bg },
+  screen: { flex: 1, backgroundColor: p.canvas },
   content: { padding: space.lg, gap: space.xl, paddingBottom: NAV_SPACE + space.xl },
   group: { gap: space.sm },
   groupTitle: { ...typography.micro, color: p.ink3, textTransform: "uppercase" },
   card: {
-    backgroundColor: p.surface, borderRadius: radius.md, overflow: "hidden",
+    ...p.glass, borderRadius: radius.md, overflow: "hidden",
     borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule,
   },
   row: {

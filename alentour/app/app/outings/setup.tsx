@@ -114,7 +114,7 @@ export default function Setup() {
 }
 
 const styles = (p: Palette) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: p.bg },
+  screen: { flex: 1, backgroundColor: p.canvas },
   content: { padding: space.lg, gap: space.lg, paddingBottom: space.xxl },
   title: { ...typography.title, color: p.ink },
   body: { ...typography.body, color: p.ink },
@@ -122,7 +122,7 @@ const styles = (p: Palette) => StyleSheet.create({
   label: { ...typography.heading, color: p.ink },
   error: { ...typography.body, color: p.danger },
   done: { ...typography.heading, color: p.accent },
-  card: { gap: space.sm, padding: space.md, backgroundColor: p.surface, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule },
+  card: { gap: space.sm, padding: space.md, ...p.glass, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: p.rule },
   input: { borderWidth: 1, borderColor: p.rule, borderRadius: radius.md, padding: space.md, color: p.ink, backgroundColor: p.bg, fontSize: 17 },
   switchRow: { flexDirection: "row", alignItems: "center", gap: space.md },
   primary: { backgroundColor: p.accent, padding: space.md, borderRadius: radius.pill, alignItems: "center" },

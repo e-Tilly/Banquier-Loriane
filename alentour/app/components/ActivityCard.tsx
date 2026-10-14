@@ -30,7 +30,7 @@ export function HeartButton({ saved, onPress, label, size = 38, tint = "light" }
       hitSlop={10} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: saved }}
       style={{
         width: size, height: size, borderRadius: size / 2, alignItems: "center", justifyContent: "center",
-        backgroundColor: onArt ? "rgba(255,255,255,0.92)" : p.accentSoft,
+        ...(onArt ? p.glassStrong : p.glass),
       }}
     >
       <Icon name={saved ? "heart-fill" : "heart"} size={size * 0.5} color={saved ? "#D6455D" : onArt ? "#1F2326" : p.ink2} />
@@ -119,14 +119,14 @@ export function Pill({ p, label, tone }: { p: Palette; label: string; tone: "bra
 
 const styles = (p: Palette) => StyleSheet.create({
   // vertical card
-  tall: { backgroundColor: p.surface, borderRadius: radius.lg, padding: 10, gap: 10 },
+  tall: { ...p.glassFlat, backgroundColor: "rgba(255,255,255,0.66)", borderRadius: radius.lg, padding: 10, gap: 10 },
   tallArt: { height: 150, borderRadius: radius.lg - 4 },
   heartPos: { position: "absolute", top: 10, right: 10 },
   tallBody: { paddingHorizontal: 6, paddingBottom: 4, gap: 3 },
   tallFoot: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6 },
   go: { width: 38, height: 38, borderRadius: 19, backgroundColor: p.accent, alignItems: "center", justifyContent: "center" },
   // row
-  row: { flexDirection: "row", alignItems: "center", gap: space.md, padding: 10, backgroundColor: p.surface, borderRadius: radius.lg },
+  row: { flexDirection: "row", alignItems: "center", gap: space.md, padding: 10, ...p.glass, borderRadius: radius.lg },
   rowArt: { width: 92, height: 104, borderRadius: radius.lg - 6 },
   rowBody: { flex: 1, gap: 3, paddingVertical: 2 },
   place: { flexDirection: "row", alignItems: "center", gap: 4 },

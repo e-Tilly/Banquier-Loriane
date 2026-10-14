@@ -29,9 +29,7 @@ shim = """
 """ % (fr, en, wx)
 page = f"""<title>Alentour</title>
 <style>
-:root {{ --bg: #F4F6F3; box-sizing: border-box; }}
-@media (prefers-color-scheme: dark) {{ :root:not([data-theme="light"]) {{ --bg: #121614; color-scheme: dark; }} }}
-:root[data-theme="dark"] {{ --bg: #121614; color-scheme: dark; }}
+:root {{ --bg: #EEF1F8; box-sizing: border-box; color-scheme: light; }}
 body {{ background: var(--bg); }}
 html, body {{ height: 100%; }}
 body {{ overflow: hidden; }}
