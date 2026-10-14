@@ -17,6 +17,7 @@ import { ReportSheet } from "../../components/ReportSheet.tsx";
 import { GoTogether } from "../../components/GoTogether.tsx";
 import { communityApi } from "../../lib/community.ts";
 import { Art } from "../../components/Art.tsx";
+import { useAmbientCategories } from "../../lib/ambient.tsx";
 import { Icon } from "../../components/Icon.tsx";
 import { Pill } from "../../components/ActivityCard.tsx";
 
@@ -46,6 +47,8 @@ export default function ActivityDetail() {
     () => catalog?.venues.find((v) => v.id === activity?.venueId) ?? null,
     [catalog, activity],
   );
+
+  useAmbientCategories([activity?.cat]);
 
   if (!catalog || !activity) {
     return <SafeAreaView style={s.center}><Text style={s.body}>{t("detail.notFound")}</Text></SafeAreaView>;

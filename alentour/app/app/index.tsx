@@ -3,7 +3,7 @@
  * ranked feed. A one-line note says WHY the order changed when the weather drove it; a feed
  * that silently rearranges itself feels random, one that explains itself feels smart.
  */
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View, Text, ScrollView, FlatList, Pressable, ActivityIndicator, StyleSheet, RefreshControl, useWindowDimensions,
 } from "react-native";
@@ -17,6 +17,8 @@ import { ActivityCard } from "../components/ActivityCard.tsx";
 import { HeroCard } from "../components/HeroCard.tsx";
 import { NavBar, NAV_SPACE } from "../components/NavBar.tsx";
 import { Icon } from "../components/Icon.tsx";
+import { SnapRow } from "../components/SnapRow.tsx";
+import { useAmbient } from "../lib/ambient.tsx";
 import type { Key } from "../lib/i18n.ts";
 
 export default function Home() {
@@ -46,6 +48,30 @@ export default function Home() {
     return buildFeed(catalog, rankContext, { maxDistanceKm: 15 }, 40, taken);
   }, [catalog, rankContext, shelves, heroes]);
 
+  // Backdrop colours: the hero card in view while at the top; the rows in view once scrolled past it.
+  const { set: setAmbient } = useAmbient();
+  const heroIdx = useRef(0);
+  const scrolled = useRef(false);
+  const latest = useRef({ heroes, shelves });
+  latest.current = { heroes, shelves };
+  const ambientFromHero = () => {
+    const hs = latest.current.heroes, i = heroIdx.current;
+    setAmbient([hs[i], hs[i + 1], hs[i - 1]].filter(Boolean).map((h) => h!.activity.cat));
+  };
+  useEffect(() => { heroIdx.current = 0; if (!scrolled.current) ambientFromHero(); }, [heroes]);
+  const onViewable = useRef(({ viewableItems }: { viewableItems: { item: { activity: { cat: string } } }[] }) => {
+    if (!scrolled.current) return;
+    const cats = viewableItems.map((v) => v.item.activity.cat);
+    setAmbient(cats.length ? cats : latest.current.shelves.flatMap((sh) => sh.items.slice(0, 1).map((i) => i.activity.cat)));
+  }).current;
+  const viewability = useRef({ itemVisiblePercentThreshold: 50 }).current;
+  const onListScroll = (y: number) => {
+    const now = y > 700;
+    if (now === scrolled.current) return;
+    scrolled.current = now;
+    if (!now) ambientFromHero();
+  };
+
   const weatherNote: Key | null = !conditions.fresh ? null
     : conditions.precipitationProb > 0.5 ? "home.rainNote"
     : conditions.tempC < -15 ? "home.coldNote"
@@ -74,6 +100,8 @@ export default function Home() {
         data={feed}
         keyExtractor={(item) => item.activity.id}
         contentContainerStyle={s.list}
+        onViewableItemsChanged={onViewable} viewabilityConfig={viewability}
+        onScroll={(e) => onListScroll(e.nativeEvent.contentOffset.y)} scrollEventThrottle={64}
         refreshControl={
           <RefreshControl refreshing={refreshing} tintColor={p.ink3}
             onRefresh={() => { setRefreshing(true); setTimeout(() => setRefreshing(false), 600); }} />
@@ -121,33 +149,33 @@ export default function Home() {
 
             <Text style={s.section}>{t("home.pick")}</Text>
             <View style={s.chipsWrap}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
-                <Chip p={p} label={t("home.all")} on={cat === null} onPress={() => setCat(null)} />
+              <SnapRow gap={space.sm} inset={space.lg} style={s.chipsScroll}>
+                <Chip key="all" p={p} label={t("home.all")} on={cat === null} onPress={() => setCat(null)} />
                 {categories.map(([slug, label]) => (
                   <Chip key={slug} p={p} label={label} on={cat === slug} onPress={() => setCat(cat === slug ? null : slug)} />
                 ))}
-              </ScrollView>
+              </SnapRow>
             </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={heroW + space.md} decelerationRate="fast"
-              contentContainerStyle={s.heroRow}>
+            <SnapRow gap={space.md} inset={space.lg}
+              onIndexChange={(i) => { heroIdx.current = i; if (!scrolled.current) ambientFromHero(); }}>
               {heroes.map((item) => (
                 <HeroCard key={item.activity.id} item={item} lang={lang} width={heroW}
                   saved={isSaved(item.activity.id)} onToggleSave={toggleSave} />
               ))}
-            </ScrollView>
+            </SnapRow>
 
             {shelves.map((shelf) => (
               <View key={shelf.key} style={s.shelf}>
                 <Text style={s.section}>{shelf.label}</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.shelfRow}>
+                <SnapRow gap={space.md} inset={space.lg}>
                   {shelf.items.map((item) => (
                     <View key={item.activity.id} style={s.shelfCard}>
                       <ActivityCard item={item} lang={lang} compact
                         saved={isSaved(item.activity.id)} onToggleSave={toggleSave} />
                     </View>
                   ))}
-                </ScrollView>
+                </SnapRow>
               </View>
             ))}
 
@@ -200,14 +228,12 @@ const styles = (p: Palette) => StyleSheet.create({
   locHint: { ...typography.micro, color: p.ink3 },
   section: { ...typography.title, color: p.ink, paddingHorizontal: space.lg },
   chipsWrap: { height: 48, flexGrow: 0, flexShrink: 0, marginTop: -space.sm },
-  chips: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.lg },
+  chipsScroll: { flexGrow: 0 },
   chip: { paddingHorizontal: 18, height: 42, borderRadius: radius.pill, ...p.glassFlat, alignItems: "center", justifyContent: "center" },
   chipOn: { backgroundColor: p.accent },
   chipText: { ...typography.body, color: p.ink2, fontWeight: "500" },
   chipTextOn: { color: p.onAccent, fontWeight: "600" },
-  heroRow: { paddingHorizontal: space.lg, gap: space.md },
-  shelf: { gap: space.md },
-  shelfRow: { paddingHorizontal: space.lg, gap: space.md },
-  shelfCard: { width: 250 },
+    shelf: { gap: space.md },
+    shelfCard: { width: 250 },
   cardWrap: { paddingHorizontal: space.lg, paddingTop: space.md },
 });

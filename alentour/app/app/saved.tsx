@@ -9,6 +9,8 @@ import { useStore } from "../lib/store.tsx";
 import { usePalette, space, radius, typography, type Palette } from "../lib/theme.ts";
 import { ActivityCard } from "../components/ActivityCard.tsx";
 import { NavBar, NAV_SPACE } from "../components/NavBar.tsx";
+import { SnapRow } from "../components/SnapRow.tsx";
+import { useViewableAmbient } from "../lib/ambient.tsx";
 
 export default function Saved() {
   const p = usePalette();
@@ -33,6 +35,7 @@ export default function Saved() {
       }));
   }, [catalog, library, activeList, rankContext]);
 
+  const ambient = useViewableAmbient<Scored>((i) => i.activity.cat);
   const confirmDelete = (id: string, name: string) => {
     if (Platform.OS === "web") { deleteList(id); setListId(null); return; }
     Alert.alert(t("lists.delete"), name, [
@@ -46,13 +49,13 @@ export default function Saved() {
       <Text style={s.heading}>{t("nav.saved")}</Text>
       {lists.length > 0 ? (
         <View style={s.tabsWrap}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs}>
-            <Tab p={p} label={t("saved.all")} active={listId === null} onPress={() => setListId(null)} />
+          <SnapRow gap={space.sm} inset={space.lg}>
+            <Tab key="all" p={p} label={t("saved.all")} active={listId === null} onPress={() => setListId(null)} />
             {lists.map((l) => (
               <Tab key={l.id} p={p} label={`${l.name} · ${l.items.length}`} active={listId === l.id}
                 onPress={() => setListId(l.id)} onLongPress={() => confirmDelete(l.id, l.name)} />
             ))}
-          </ScrollView>
+          </SnapRow>
         </View>
       ) : null}
 
@@ -64,6 +67,7 @@ export default function Saved() {
       ) : (
         <FlatList
           data={items}
+          {...ambient}
           keyExtractor={(item) => item.activity.id}
           contentContainerStyle={s.list}
           renderItem={({ item }) => (

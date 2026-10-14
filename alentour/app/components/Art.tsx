@@ -8,25 +8,7 @@ import { View, Image, StyleSheet, type StyleProp, type ViewStyle } from "react-n
 import { LinearGradient } from "expo-linear-gradient";
 import { mediaUrl } from "../lib/config.ts";
 
-const PALETTES: Record<string, [string, string, string]> = {
-  "category.outdoors": ["#2F6B4F", "#8DBE8A", "#E9D58B"],
-  "category.water": ["#1C5D8C", "#4FA3C7", "#BDE3EA"],
-  "category.winter": ["#3B4F8F", "#8DA7D9", "#E3ECF8"],
-  "category.sports": ["#C4512F", "#EE8F4C", "#F6D08A"],
-  "category.thrill": ["#B02A3E", "#E2634F", "#5A2A6B"],
-  "category.arts": ["#6B3F8F", "#C77DB0", "#F3C9B8"],
-  "category.learning": ["#B7791F", "#E6B655", "#F6E3B0"],
-  "category.games": ["#1F7A78", "#5FB6A6", "#7A5FB6"],
-  "category.food": ["#B8501F", "#E88F3E", "#F5D27A"],
-  "category.nightlife": ["#35317F", "#8B4FA8", "#E266A0"],
-  "category.wellness": ["#2C7A74", "#7CC2B3", "#DDEFE3"],
-  "category.family": ["#C27A2C", "#EFB868", "#F7E2B5"],
-  "category.animals": ["#7A5230", "#C49A62", "#E8D5AE"],
-  "category.community": ["#3F6E8F", "#82B0C9", "#E1ECA9"],
-  "category.markets": ["#A23B52", "#E4807A", "#F4D3A0"],
-  "category.seasonal": ["#6A8F2F", "#C4C94F", "#F3E4A0"],
-};
-const FALLBACK: [string, string, string] = ["#4A5A63", "#8FA3AD", "#DDE5E8"];
+import { paletteFor } from "../lib/palettes.ts";
 
 function hash(s: string): number {
   let h = 2166136261;
@@ -45,7 +27,7 @@ interface Props {
 }
 
 export function Art({ id, category, img, style, scrim, children }: Props) {
-  const [c1, c2, c3] = PALETTES[category] ?? FALLBACK;
+  const [c1, c2, c3] = paletteFor(category);
   const h = hash(id);
   const a = (h % 100) / 100, b = ((h >> 7) % 100) / 100, c = ((h >> 14) % 100) / 100;
   return (

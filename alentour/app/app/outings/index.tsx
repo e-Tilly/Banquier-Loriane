@@ -11,6 +11,7 @@ import { outingsApi, type Eligibility, type OutingSummary } from "../../lib/outi
 import { usePalette, space, radius, typography, type Palette } from "../../lib/theme.ts";
 import { formatWhen } from "../../lib/format.ts";
 import { NavBar, NAV_SPACE } from "../../components/NavBar.tsx";
+import { useAmbientCategories } from "../../lib/ambient.tsx";
 
 export default function Outings() {
   const p = usePalette();
@@ -32,6 +33,7 @@ export default function Outings() {
     } catch { /* offline: keep what we had */ } finally { setLoading(false); }
   }, [account]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useAmbientCategories(outings.slice(0, 3).map((o) => catalog?.activities.find((a) => a.id === o.activityId)?.cat));
 
   if (!apiEnabled) return <Empty p={p} text={t("outings.needApi")} />;
   if (!account) {

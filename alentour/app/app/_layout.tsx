@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { View } from "react-native";
 import { AppBackground } from "../components/AppBackground.tsx";
+import { AmbientProvider } from "../lib/ambient.tsx";
 import { StoreProvider, useStore } from "../lib/store.tsx";
 import { usePalette } from "../lib/theme.ts";
 
@@ -12,12 +13,14 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <StoreProvider>
         <StatusBar style="dark" />
+        <AmbientProvider>
         <View style={{ flex: 1, backgroundColor: "#EEF1F8" }}>
           <AppBackground />
           <ThemeProvider value={{ ...DefaultTheme, colors: { ...DefaultTheme.colors, background: "transparent", card: "transparent" } }}>
             <Screens />
           </ThemeProvider>
         </View>
+        </AmbientProvider>
       </StoreProvider>
     </SafeAreaProvider>
   );

@@ -3,6 +3,7 @@ import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
 import type { Filters } from "@core/catalog/filter.ts";
 import { usePalette, space, radius, typography, type Palette } from "../lib/theme.ts";
 import { translate, type Lang } from "../lib/i18n.ts";
+import { SnapRow } from "./SnapRow.tsx";
 
 interface Props {
   filters: Filters;
@@ -34,8 +35,9 @@ export function FilterBar({ filters, onChange, onOpenSheet, lang }: Props) {
     // Wrapped in a plain View: a horizontal ScrollView inside a flex column gets squeezed to
     // zero height and clips its own chips. The wrapper fixes the row height explicitly.
     <View style={s.wrap}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.row} style={s.scroll}>
+      <SnapRow gap={space.sm} inset={space.lg} style={s.scroll}>
         <Chip
+          key="dist"
           p={p}
           label={filters.maxDistanceKm ? `${filters.maxDistanceKm} km` : tr("chip.distance")}
           active={filters.maxDistanceKm !== undefined && filters.maxDistanceKm !== 10}
@@ -44,13 +46,13 @@ export function FilterBar({ filters, onChange, onOpenSheet, lang }: Props) {
             set({ maxDistanceKm: DISTANCE_STEPS[(i + 1) % DISTANCE_STEPS.length] });
           }}
         />
-        <Chip p={p} label={tr("chip.free")} active={!!filters.freeOnly}
+        <Chip key="free" p={p} label={tr("chip.free")} active={!!filters.freeOnly}
           onPress={() => set({ freeOnly: filters.freeOnly ? undefined : true })} />
-        <Chip p={p} label={tr("chip.openNow")} active={!!filters.openNow}
+        <Chip key="open" p={p} label={tr("chip.openNow")} active={!!filters.openNow}
           onPress={() => set({ openNow: filters.openNow ? undefined : true })} />
-        <Chip p={p} label={activeCount > 0 ? `${tr("chip.filters")} (${activeCount})` : tr("chip.filters")}
+        <Chip key="filters" p={p} label={activeCount > 0 ? `${tr("chip.filters")} (${activeCount})` : tr("chip.filters")}
           active={activeCount > 0} onPress={onOpenSheet} />
-      </ScrollView>
+      </SnapRow>
     </View>
   );
 }

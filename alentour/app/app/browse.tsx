@@ -10,6 +10,7 @@ import { FilterBar } from "../components/FilterBar.tsx";
 import { FilterSheet } from "../components/FilterSheet.tsx";
 import { NavBar, NAV_SPACE } from "../components/NavBar.tsx";
 import { Icon } from "../components/Icon.tsx";
+import { useViewableAmbient } from "../lib/ambient.tsx";
 import type { Key } from "../lib/i18n.ts";
 
 export default function Browse() {
@@ -19,6 +20,7 @@ export default function Browse() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [query, setQuery] = useState("");
 
+  const ambient = useViewableAmbient<{ activity: { cat: string } }>((i) => i.activity.cat);
   const outcome = useMemo(() => {
     if (!catalog) return null;
     return applyFilters(catalog.activities, { ...filters, query: query || undefined }, rankContext);
@@ -52,6 +54,7 @@ export default function Browse() {
 
       <FlatList
         data={showing}
+        {...ambient}
         keyExtractor={(item) => item.activity.id}
         contentContainerStyle={s.list}
         ListHeaderComponent={
